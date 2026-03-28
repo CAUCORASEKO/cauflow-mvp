@@ -1,22 +1,44 @@
 import { pool } from "../config/db.js";
+import fs from "fs/promises";
+
+const removeUploadedFile = async (filePath) => {
+  if (!filePath) {
+    return;
+  }
+
+  try {
+    await fs.unlink(filePath);
+  } catch (error) {
+    if (error.code !== "ENOENT") {
+      console.error(`Failed to remove uploaded file: ${filePath}`, error.message);
+    }
+  }
+};
 
 export const uploadAsset = async (req, res) => {
+  const uploadedFilePath = req.file?.path;
+
   try {
     const { title, description } = req.body;
+    const normalizedTitle = title?.trim();
 
-    if (!title) {
+    if (!normalizedTitle) {
+      await removeUploadedFile(uploadedFilePath);
+
       return res.status(400).json({
         message: "title is required"
       });
     }
 
+    const imageUrl = req.file ? `/uploads/assets/${req.file.filename}` : null;
+
     const result = await pool.query(
       `
-      INSERT INTO assets (title, description)
-      VALUES ($1, $2)
+      INSERT INTO assets (title, description, image_url)
+      VALUES ($1, $2, $3)
       RETURNING *
       `,
-      [title, description || null]
+      [normalizedTitle, description || null, imageUrl]
     );
 
     res.status(201).json({
@@ -24,6 +46,8 @@ export const uploadAsset = async (req, res) => {
       data: result.rows[0]
     });
   } catch (error) {
+    await removeUploadedFile(uploadedFilePath);
+
     res.status(500).json({
       message: "Error creating asset",
       error: error.message

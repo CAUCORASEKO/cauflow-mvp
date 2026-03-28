@@ -4,10 +4,11 @@ import {
   getAssets,
   getAssetById
 } from "../controllers/asset.controller.js";
+import { uploadAssetImage } from "../middleware/asset-upload.middleware.js";
 
 const router = express.Router();
 
-router.post("/", uploadAsset);
+router.post("/", uploadAssetImage, uploadAsset);
 router.get("/", getAssets);
 router.get("/:id", getAssetById);
 
