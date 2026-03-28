@@ -1,4 +1,4 @@
-const assets = [];
+import { assets } from "../models/assets.memory.js";
 
 export const uploadAsset = (req, res) => {
   const { title, description } = req.body;
