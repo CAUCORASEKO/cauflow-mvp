@@ -1,60 +1,97 @@
-import { purchases } from "../models/purchases.memory.js";
-import { licenses } from "../models/licenses.memory.js";
+import { pool } from "../config/db.js";
 
-export const createPurchase = (req, res) => {
-  const { licenseId, buyerEmail } = req.body;
+export const createPurchase = async (req, res) => {
+  try {
+    const { licenseId, buyerEmail } = req.body;
 
-  if (!licenseId || !buyerEmail) {
-    return res.status(400).json({
-      message: "licenseId and buyerEmail are required"
+    if (!licenseId || !buyerEmail) {
+      return res.status(400).json({
+        message: "licenseId and buyerEmail are required"
+      });
+    }
+
+    const numericLicenseId = Number(licenseId);
+
+    const licenseResult = await pool.query(
+      `
+      SELECT * FROM licenses
+      WHERE id = $1
+      `,
+      [numericLicenseId]
+    );
+
+    if (licenseResult.rows.length === 0) {
+      return res.status(404).json({
+        message: "License not found. Cannot create purchase."
+      });
+    }
+
+    const result = await pool.query(
+      `
+      INSERT INTO purchases (license_id, buyer_email, status)
+      VALUES ($1, $2, $3)
+      RETURNING *
+      `,
+      [numericLicenseId, buyerEmail, "completed"]
+    );
+
+    res.status(201).json({
+      message: "Purchase created successfully",
+      data: result.rows[0]
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error creating purchase",
+      error: error.message
     });
   }
-
-  const numericLicenseId = Number(licenseId);
-
-  const licenseExists = licenses.find((item) => item.id === numericLicenseId);
-
-  if (!licenseExists) {
-    return res.status(404).json({
-      message: "License not found. Cannot create purchase."
-    });
-  }
-
-  const newPurchase = {
-    id: purchases.length + 1,
-    licenseId: numericLicenseId,
-    buyerEmail,
-    status: "completed"
-  };
-
-  purchases.push(newPurchase);
-
-  res.status(201).json({
-    message: "Purchase created successfully",
-    data: newPurchase
-  });
 };
 
-export const getPurchases = (req, res) => {
-  res.status(200).json({
-    message: "Purchases fetched successfully",
-    data: purchases
-  });
-};
+export const getPurchases = async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT * FROM purchases
+      ORDER BY id ASC
+    `);
 
-export const getPurchaseById = (req, res) => {
-  const purchaseId = Number(req.params.id);
-
-  const purchase = purchases.find((item) => item.id === purchaseId);
-
-  if (!purchase) {
-    return res.status(404).json({
-      message: "Purchase not found"
+    res.status(200).json({
+      message: "Purchases fetched successfully",
+      data: result.rows
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error fetching purchases",
+      error: error.message
     });
   }
+};
 
-  res.status(200).json({
-    message: "Purchase fetched successfully",
-    data: purchase
-  });
+export const getPurchaseById = async (req, res) => {
+  try {
+    const purchaseId = Number(req.params.id);
+
+    const result = await pool.query(
+      `
+      SELECT * FROM purchases
+      WHERE id = $1
+      `,
+      [purchaseId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        message: "Purchase not found"
+      });
+    }
+
+    res.status(200).json({
+      message: "Purchase fetched successfully",
+      data: result.rows[0]
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error fetching purchase",
+      error: error.message
+    });
+  }
 };

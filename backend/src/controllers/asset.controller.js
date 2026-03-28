@@ -1,42 +1,81 @@
-import { assets } from "../models/assets.memory.js";
+import { pool } from "../config/db.js";
 
-export const uploadAsset = (req, res) => {
-  const { title, description } = req.body;
+export const uploadAsset = async (req, res) => {
+  try {
+    const { title, description } = req.body;
 
-  const newAsset = {
-    id: assets.length + 1,
-    title,
-    description
-  };
+    if (!title) {
+      return res.status(400).json({
+        message: "title is required"
+      });
+    }
 
-  assets.push(newAsset);
+    const result = await pool.query(
+      `
+      INSERT INTO assets (title, description)
+      VALUES ($1, $2)
+      RETURNING *
+      `,
+      [title, description || null]
+    );
 
-  res.status(201).json({
-    message: "Asset uploaded successfully",
-    data: newAsset
-  });
-};
-
-export const getAssets = (req, res) => {
-  res.status(200).json({
-    message: "Assets fetched successfully",
-    data: assets
-  });
-};
-
-export const getAssetById = (req, res) => {
-  const assetId = Number(req.params.id);
-
-  const asset = assets.find((item) => item.id === assetId);
-
-  if (!asset) {
-    return res.status(404).json({
-      message: "Asset not found"
+    res.status(201).json({
+      message: "Asset uploaded successfully",
+      data: result.rows[0]
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error creating asset",
+      error: error.message
     });
   }
+};
 
-  res.status(200).json({
-    message: "Asset fetched successfully",
-    data: asset
-  });
+export const getAssets = async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT * FROM assets
+      ORDER BY id ASC
+    `);
+
+    res.status(200).json({
+      message: "Assets fetched successfully",
+      data: result.rows
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error fetching assets",
+      error: error.message
+    });
+  }
+};
+
+export const getAssetById = async (req, res) => {
+  try {
+    const assetId = Number(req.params.id);
+
+    const result = await pool.query(
+      `
+      SELECT * FROM assets
+      WHERE id = $1
+      `,
+      [assetId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        message: "Asset not found"
+      });
+    }
+
+    res.status(200).json({
+      message: "Asset fetched successfully",
+      data: result.rows[0]
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error fetching asset",
+      error: error.message
+    });
+  }
 };
