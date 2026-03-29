@@ -46,51 +46,66 @@ export function PurchaseForm({
 
   return (
     <Card className="p-6">
-      <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5 text-sky-200">
+      <div className="mb-6 flex items-start gap-4">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/8 bg-white/5 text-sky-200">
           <CreditCard className="h-5 w-5" />
         </div>
         <div>
-          <h3 className="font-display text-2xl text-white">Record purchase</h3>
-          <p className="text-sm text-slate-400">
-            Simulate the legal checkout and payment trail.
+          <p className="text-xs uppercase tracking-[0.22em] text-slate-500">
+            Transaction trail
+          </p>
+          <h3 className="mt-2 font-display text-2xl text-white">Record purchase</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-400">
+            Capture the commercial event against an existing license without changing
+            the backend purchase flow.
           </p>
         </div>
       </div>
 
       <form className="space-y-4" onSubmit={handleSubmit}>
-        <Select
-          value={licenseId}
-          onChange={(event) => setLicenseId(event.target.value)}
-          required
-        >
-          <option value="">Select a license</option>
-          {licenses.map((license) => (
-            <option key={license.id} value={license.id}>
-              #{license.id} {license.type} {formatCurrency(Number(license.price))}
-            </option>
-          ))}
-        </Select>
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-slate-200">License package</label>
+          <Select
+            value={licenseId}
+            onChange={(event) => setLicenseId(event.target.value)}
+            required
+          >
+            <option value="">Select a license</option>
+            {licenses.map((license) => (
+              <option key={license.id} value={license.id}>
+                #{license.id} {license.type} {formatCurrency(Number(license.price))}
+              </option>
+            ))}
+          </Select>
+        </div>
 
-        <Input
-          type="email"
-          placeholder="buyer@company.com"
-          value={buyerEmail}
-          onChange={(event) => setBuyerEmail(event.target.value)}
-          required
-        />
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-slate-200">Buyer email</label>
+          <Input
+            type="email"
+            placeholder="buyer@company.com"
+            value={buyerEmail}
+            onChange={(event) => setBuyerEmail(event.target.value)}
+            required
+          />
+        </div>
 
         {feedback ? <p className="text-sm text-emerald-300">{feedback}</p> : null}
         {error ? <p className="text-sm text-rose-300">{error}</p> : null}
 
-        <Button
-          type="submit"
-          variant="secondary"
-          disabled={submitting || licenses.length === 0}
-          className="w-full"
-        >
-          {submitting ? "Creating purchase..." : "Create purchase"}
-        </Button>
+        <div className="flex items-center justify-between gap-3 border-t border-white/8 pt-4">
+          <p className="text-sm text-slate-400">
+            Purchases refresh the live revenue view once the request completes.
+          </p>
+          <Button
+            type="submit"
+            variant="secondary"
+            disabled={submitting || licenses.length === 0}
+            className="min-w-[176px]"
+          >
+            {submitting ? "Creating purchase..." : "Create purchase"}
+          </Button>
+        </div>
       </form>
     </Card>
   );

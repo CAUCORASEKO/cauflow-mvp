@@ -32,25 +32,27 @@ export function PurchaseList({
           return (
             <div
               key={purchase.id}
-              className="rounded-2xl border border-white/8 bg-white/[0.02] p-4"
+              className="rounded-[24px] border border-white/8 bg-white/[0.025] p-4"
             >
-              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <p className="font-semibold text-white">{purchase.buyerEmail}</p>
-                  <p className="text-sm text-slate-400">
+                  <p className="mt-2 text-sm text-slate-400">
                     License #{purchase.licenseId} {license ? `· ${license.type}` : ""}
                   </p>
                 </div>
-                <div className="text-left md:text-right">
-                  <p className="font-display text-xl text-white">
-                    {license ? formatCurrency(Number(license.price)) : "N/A"}
-                  </p>
+                <div className="flex flex-wrap items-center gap-3 text-left md:justify-end md:text-right">
                   <p className="text-xs uppercase tracking-[0.18em] text-emerald-300">
                     {purchase.status}
                   </p>
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                    {formatDate(purchase.createdAt)}
-                  </p>
+                  <div>
+                    <p className="font-display text-xl text-white">
+                      {license ? formatCurrency(Number(license.price)) : "N/A"}
+                    </p>
+                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                      {formatDate(purchase.createdAt)}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>

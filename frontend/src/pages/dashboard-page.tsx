@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Boxes, CreditCard, ShieldCheck } from "lucide-react";
+import { ArrowUpRight, Boxes, CreditCard, RefreshCcw, ShieldCheck } from "lucide-react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { AssetUploadForm } from "@/components/dashboard/asset-upload-form";
 import { AssetsGrid } from "@/components/dashboard/assets-grid";
@@ -21,6 +21,7 @@ export function DashboardPage() {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
 
   const loadDashboard = useCallback(async () => {
     try {
@@ -34,6 +35,7 @@ export function DashboardPage() {
       setAssets(nextAssets);
       setLicenses(nextLicenses);
       setPurchases(nextPurchases);
+      setLastSyncedAt(new Date());
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load data");
     } finally {
@@ -51,42 +53,91 @@ export function DashboardPage() {
   }, 0);
 
   return (
-    <DashboardShell>
-      <section className="glass-panel rounded-[32px] border border-white/10 p-8">
-        <div className="grid gap-8 lg:grid-cols-[1.2fr,0.8fr]">
-          <div>
-            <p className="text-sm uppercase tracking-[0.28em] text-sky-200">
-              Workspace
+    <DashboardShell
+      assetsCount={assets.length}
+      licensesCount={licenses.length}
+      purchasesCount={purchases.length}
+      totalRevenue={totalRevenue}
+      hasError={Boolean(error)}
+    >
+      <section
+        id="overview"
+        className="glass-panel rounded-[30px] border border-white/10 p-5 md:p-6 xl:p-7"
+      >
+        <div className="grid gap-4 lg:gap-5 xl:gap-6 lg:grid-cols-[minmax(0,1.2fr),minmax(320px,0.84fr)] 2xl:grid-cols-[minmax(0,1.28fr),390px]">
+          <div className="max-w-3xl self-start">
+            <p className="text-xs uppercase tracking-[0.28em] text-sky-200">
+              Workspace overview
             </p>
-            <h1 className="mt-4 font-display text-5xl font-semibold tracking-tight text-white">
-              Run your AI licensing flow from one premium command surface.
+            <h1 className="mt-3 font-display text-[2.45rem] font-semibold tracking-tight text-white sm:text-[2.8rem] lg:text-[2.95rem] xl:text-[3.25rem] xl:leading-[1.02]">
+              Operate the full asset-to-license pipeline from one command surface.
             </h1>
-            <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">
-              Upload assets, define licensing packages, and record purchases against
-              the live CauFlow backend.
+            <p className="mt-3 max-w-2xl text-[15px] leading-7 text-slate-300 md:text-base xl:text-lg">
+              Review inventory, package rights, and record purchase activity against
+              the live CauFlow backend without leaving the workspace.
             </p>
           </div>
 
-          <Card className="p-6">
-            <p className="text-sm uppercase tracking-[0.22em] text-slate-500">
-              API status
-            </p>
-            <div className="mt-4 flex items-center gap-3">
-              <div className="h-3 w-3 rounded-full bg-emerald-400" />
-              <span className="font-semibold text-white">
-                {error ? "Needs attention" : "Connected to localhost:5001"}
-              </span>
+          <div className="grid w-full gap-3 self-start sm:grid-cols-2">
+            <div className="rounded-[24px] border border-white/10 bg-black/20 p-4 sm:col-span-2">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
+                    API status
+                  </p>
+                  <div className="mt-2 flex items-center gap-2.5">
+                    <div
+                      className={`h-2.5 w-2.5 rounded-full ${
+                        error ? "bg-rose-300" : "bg-emerald-400"
+                      }`}
+                    />
+                    <span className="text-sm font-semibold text-white">
+                      {error ? "Needs attention" : "Connected to localhost:5001"}
+                    </span>
+                  </div>
+                </div>
+                <Button
+                  variant="secondary"
+                  onClick={() => void loadDashboard()}
+                  className="gap-2 px-4 py-2.5"
+                >
+                  <RefreshCcw className="h-4 w-4" />
+                  Refresh
+                </Button>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                <span>Assets</span>
+                <span>Licenses</span>
+                <span>Purchases</span>
+                <span>
+                  {lastSyncedAt
+                    ? `Synced ${lastSyncedAt.toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit"
+                      })}`
+                    : "Awaiting sync"}
+                </span>
+              </div>
             </div>
-            <p className="mt-4 text-sm leading-6 text-slate-400">
-              The dashboard consumes the same asset, license, and purchase endpoints
-              used by the backend MVP.
-            </p>
-            <div className="mt-6">
-              <Button variant="secondary" onClick={() => void loadDashboard()}>
-                Refresh data
-              </Button>
+
+            <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-3.5 xl:p-4">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
+                Focus
+              </p>
+              <p className="mt-2 text-sm font-medium text-white">
+                Build clean licensable inventory
+              </p>
             </div>
-          </Card>
+            <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-3.5 xl:p-4">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
+                Flow health
+              </p>
+              <p className="mt-2 flex items-center gap-2 text-sm font-medium text-white">
+                Live workspace
+                <ArrowUpRight className="h-4 w-4 text-sky-200" />
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -97,7 +148,7 @@ export function DashboardPage() {
         </Card>
       ) : null}
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="grid gap-4 lg:grid-cols-3">
         <MetricCard
           label="Assets"
           value={String(assets.length)}
@@ -118,13 +169,18 @@ export function DashboardPage() {
         />
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[0.9fr,1.1fr]">
-        <AssetUploadForm onCreated={loadDashboard} />
-        <Card className="p-6">
+      <section
+        id="assets"
+        className="grid gap-5 xl:grid-cols-[minmax(320px,0.88fr),minmax(0,1.12fr)] 2xl:grid-cols-[380px,minmax(0,1fr)]"
+      >
+        <div className="xl:sticky xl:top-4 2xl:top-5 xl:self-start">
+          <AssetUploadForm onCreated={loadDashboard} />
+        </div>
+        <Card className="p-6 md:p-7">
           <SectionHeading
             eyebrow="Assets"
             title="Visual inventory"
-            copy="Every uploaded asset appears here with a live preview sourced from the backend static file server."
+            copy="A broader inventory surface makes previews, IDs, descriptions, and timestamps easier to scan at a glance."
           />
           <div className="mt-8">
             {loading ? (
@@ -140,40 +196,42 @@ export function DashboardPage() {
         </Card>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-2">
-        <LicenseForm assets={assets} onCreated={loadDashboard} />
-        {loading ? (
-          <Card className="p-6">
-            <p className="text-sm text-slate-400">Loading licenses...</p>
-          </Card>
-        ) : licenses.length > 0 ? (
-          <LicenseList licenses={licenses} assets={assets} />
-        ) : (
-          <Card className="p-6">
-            <p className="font-display text-2xl text-white">Licenses</p>
-            <p className="mt-3 text-sm text-slate-400">
-              No licenses yet. Create one from an existing asset.
-            </p>
-          </Card>
-        )}
-      </section>
+      <section className="grid gap-5 xl:grid-cols-2">
+        <div id="licenses" className="space-y-6">
+          <LicenseForm assets={assets} onCreated={loadDashboard} />
+          {loading ? (
+            <Card className="p-6">
+              <p className="text-sm text-slate-400">Loading licenses...</p>
+            </Card>
+          ) : licenses.length > 0 ? (
+            <LicenseList licenses={licenses} assets={assets} />
+          ) : (
+            <Card className="p-6">
+              <p className="font-display text-2xl text-white">Licenses</p>
+              <p className="mt-3 text-sm text-slate-400">
+                No licenses yet. Create one from an existing asset.
+              </p>
+            </Card>
+          )}
+        </div>
 
-      <section className="grid gap-6 xl:grid-cols-2">
-        <PurchaseForm licenses={licenses} onCreated={loadDashboard} />
-        {loading ? (
-          <Card className="p-6">
-            <p className="text-sm text-slate-400">Loading purchases...</p>
-          </Card>
-        ) : purchases.length > 0 ? (
-          <PurchaseList purchases={purchases} licenses={licenses} />
-        ) : (
-          <Card className="p-6">
-            <p className="font-display text-2xl text-white">Purchases</p>
-            <p className="mt-3 text-sm text-slate-400">
-              No purchases yet. Record a purchase against any created license.
-            </p>
-          </Card>
-        )}
+        <div id="purchases" className="space-y-6">
+          <PurchaseForm licenses={licenses} onCreated={loadDashboard} />
+          {loading ? (
+            <Card className="p-6">
+              <p className="text-sm text-slate-400">Loading purchases...</p>
+            </Card>
+          ) : purchases.length > 0 ? (
+            <PurchaseList purchases={purchases} licenses={licenses} />
+          ) : (
+            <Card className="p-6">
+              <p className="font-display text-2xl text-white">Purchases</p>
+              <p className="mt-3 text-sm text-slate-400">
+                No purchases yet. Record a purchase against any created license.
+              </p>
+            </Card>
+          )}
+        </div>
       </section>
     </DashboardShell>
   );
