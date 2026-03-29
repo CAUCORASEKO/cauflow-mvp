@@ -1,5 +1,6 @@
 import { pool } from "../config/db.js";
 import fs from "fs/promises";
+import { normalizeResponseData } from "../utils/normalize-response.js";
 
 const removeUploadedFile = async (filePath) => {
   if (!filePath) {
@@ -43,7 +44,7 @@ export const uploadAsset = async (req, res) => {
 
     res.status(201).json({
       message: "Asset uploaded successfully",
-      data: result.rows[0]
+      data: normalizeResponseData(result.rows[0])
     });
   } catch (error) {
     await removeUploadedFile(uploadedFilePath);
@@ -64,7 +65,7 @@ export const getAssets = async (req, res) => {
 
     res.status(200).json({
       message: "Assets fetched successfully",
-      data: result.rows
+      data: normalizeResponseData(result.rows)
     });
   } catch (error) {
     res.status(500).json({
@@ -94,7 +95,7 @@ export const getAssetById = async (req, res) => {
 
     res.status(200).json({
       message: "Asset fetched successfully",
-      data: result.rows[0]
+      data: normalizeResponseData(result.rows[0])
     });
   } catch (error) {
     res.status(500).json({

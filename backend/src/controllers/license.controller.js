@@ -1,4 +1,5 @@
 import { pool } from "../config/db.js";
+import { normalizeResponseData } from "../utils/normalize-response.js";
 
 export const createLicense = async (req, res) => {
   try {
@@ -37,7 +38,7 @@ export const createLicense = async (req, res) => {
 
     res.status(201).json({
       message: "License created successfully",
-      data: result.rows[0]
+      data: normalizeResponseData(result.rows[0])
     });
   } catch (error) {
     res.status(500).json({
@@ -56,7 +57,7 @@ export const getLicenses = async (req, res) => {
 
     res.status(200).json({
       message: "Licenses fetched successfully",
-      data: result.rows
+      data: normalizeResponseData(result.rows)
     });
   } catch (error) {
     res.status(500).json({
@@ -86,7 +87,7 @@ export const getLicenseById = async (req, res) => {
 
     res.status(200).json({
       message: "License fetched successfully",
-      data: result.rows[0]
+      data: normalizeResponseData(result.rows[0])
     });
   } catch (error) {
     res.status(500).json({

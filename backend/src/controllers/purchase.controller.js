@@ -1,4 +1,5 @@
 import { pool } from "../config/db.js";
+import { normalizeResponseData } from "../utils/normalize-response.js";
 
 export const createPurchase = async (req, res) => {
   try {
@@ -37,7 +38,7 @@ export const createPurchase = async (req, res) => {
 
     res.status(201).json({
       message: "Purchase created successfully",
-      data: result.rows[0]
+      data: normalizeResponseData(result.rows[0])
     });
   } catch (error) {
     res.status(500).json({
@@ -56,7 +57,7 @@ export const getPurchases = async (req, res) => {
 
     res.status(200).json({
       message: "Purchases fetched successfully",
-      data: result.rows
+      data: normalizeResponseData(result.rows)
     });
   } catch (error) {
     res.status(500).json({
@@ -86,7 +87,7 @@ export const getPurchaseById = async (req, res) => {
 
     res.status(200).json({
       message: "Purchase fetched successfully",
-      data: result.rows[0]
+      data: normalizeResponseData(result.rows[0])
     });
   } catch (error) {
     res.status(500).json({
