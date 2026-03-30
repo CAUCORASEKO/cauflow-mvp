@@ -18,6 +18,22 @@ CREATE TABLE IF NOT EXISTS licenses (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS license_policies (
+  id SERIAL PRIMARY KEY,
+  license_id INTEGER NOT NULL UNIQUE REFERENCES licenses(id) ON DELETE CASCADE,
+  commercial_use BOOLEAN NOT NULL DEFAULT false,
+  ai_training VARCHAR(50) NOT NULL DEFAULT 'not_allowed',
+  derivative_works VARCHAR(50) NOT NULL DEFAULT 'not_allowed',
+  attribution VARCHAR(50) NOT NULL DEFAULT 'not_required',
+  license_scope VARCHAR(50) NOT NULL DEFAULT 'non_exclusive',
+  redistribution VARCHAR(50) NOT NULL DEFAULT 'not_allowed',
+  usage_type VARCHAR(50) NOT NULL DEFAULT 'commercial',
+  policy_version VARCHAR(20) NOT NULL DEFAULT 'v1',
+  summary TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS purchases (
   id SERIAL PRIMARY KEY,
   license_id INTEGER NOT NULL REFERENCES licenses(id) ON DELETE CASCADE,

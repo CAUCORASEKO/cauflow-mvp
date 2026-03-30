@@ -1,9 +1,154 @@
 import { pool } from "../config/db.js";
 import { normalizeResponseData } from "../utils/normalize-response.js";
+import {
+  getDefaultLicensePolicy,
+  validateAndBuildPolicy
+} from "../utils/license-policy.js";
+
+const fetchPolicyByLicenseId = async (db, licenseId) => {
+  const result = await db.query(
+    `
+    SELECT * FROM license_policies
+    WHERE license_id = $1
+    `,
+    [licenseId]
+  );
+
+  return result.rows[0] || null;
+};
+
+const fetchLicenseWithPolicyById = async (db, licenseId) => {
+  const licenseResult = await db.query(
+    `
+    SELECT * FROM licenses
+    WHERE id = $1
+    `,
+    [licenseId]
+  );
+
+  if (licenseResult.rows.length === 0) {
+    return null;
+  }
+
+  const license = licenseResult.rows[0];
+  const policy = await fetchPolicyByLicenseId(db, licenseId);
+
+  return {
+    ...license,
+    policy
+  };
+};
+
+const attachPoliciesToLicenses = async (db, licenses) => {
+  if (licenses.length === 0) {
+    return [];
+  }
+
+  const licenseIds = licenses.map((license) => license.id);
+  const policyResult = await db.query(
+    `
+    SELECT * FROM license_policies
+    WHERE license_id = ANY($1::int[])
+    `,
+    [licenseIds]
+  );
+
+  const policyByLicenseId = new Map(
+    policyResult.rows.map((policy) => [policy.license_id, policy])
+  );
+
+  return licenses.map((license) => ({
+    ...license,
+    policy: policyByLicenseId.get(license.id) || null
+  }));
+};
+
+const upsertLicensePolicy = async (db, licenseId, policyInput) => {
+  const existingPolicy = await fetchPolicyByLicenseId(db, licenseId);
+  const policy = validateAndBuildPolicy(
+    policyInput,
+    existingPolicy
+      ? normalizeResponseData(existingPolicy)
+      : getDefaultLicensePolicy()
+  );
+
+  if (existingPolicy) {
+    await db.query(
+      `
+      UPDATE license_policies
+      SET commercial_use = $1,
+          ai_training = $2,
+          derivative_works = $3,
+          attribution = $4,
+          license_scope = $5,
+          redistribution = $6,
+          usage_type = $7,
+          policy_version = $8,
+          summary = $9,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE license_id = $10
+      `,
+      [
+        policy.commercialUse,
+        policy.aiTraining,
+        policy.derivativeWorks,
+        policy.attribution,
+        policy.licenseScope,
+        policy.redistribution,
+        policy.usageType,
+        policy.policyVersion,
+        policy.summary,
+        licenseId
+      ]
+    );
+  } else {
+    await db.query(
+      `
+      INSERT INTO license_policies (
+        license_id,
+        commercial_use,
+        ai_training,
+        derivative_works,
+        attribution,
+        license_scope,
+        redistribution,
+        usage_type,
+        policy_version,
+        summary
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `,
+      [
+        licenseId,
+        policy.commercialUse,
+        policy.aiTraining,
+        policy.derivativeWorks,
+        policy.attribution,
+        policy.licenseScope,
+        policy.redistribution,
+        policy.usageType,
+        policy.policyVersion,
+        policy.summary
+      ]
+    );
+  }
+};
+
+const deleteLicensePolicy = async (db, licenseId) => {
+  await db.query(
+    `
+    DELETE FROM license_policies
+    WHERE license_id = $1
+    `,
+    [licenseId]
+  );
+};
 
 export const createLicense = async (req, res) => {
+  const client = await pool.connect();
+
   try {
-    const { assetId, type, price, usage } = req.body;
+    const { assetId, type, price, usage, policy } = req.body;
 
     if (!assetId || !type || price === undefined || !usage) {
       return res.status(400).json({
@@ -13,7 +158,7 @@ export const createLicense = async (req, res) => {
 
     const numericAssetId = Number(assetId);
 
-    const assetResult = await pool.query(
+    const assetResult = await client.query(
       `
       SELECT * FROM assets
       WHERE id = $1
@@ -27,7 +172,9 @@ export const createLicense = async (req, res) => {
       });
     }
 
-    const result = await pool.query(
+    await client.query("BEGIN");
+
+    const result = await client.query(
       `
       INSERT INTO licenses (asset_id, type, price, usage)
       VALUES ($1, $2, $3, $4)
@@ -36,15 +183,35 @@ export const createLicense = async (req, res) => {
       [numericAssetId, type, price, usage]
     );
 
+    const createdLicense = result.rows[0];
+
+    if (policy && typeof policy === "object") {
+      await upsertLicensePolicy(client, createdLicense.id, policy);
+    }
+
+    await client.query("COMMIT");
+
+    const licenseWithPolicy = await fetchLicenseWithPolicyById(client, createdLicense.id);
+
     res.status(201).json({
       message: "License created successfully",
-      data: normalizeResponseData(result.rows[0])
+      data: normalizeResponseData(licenseWithPolicy)
     });
   } catch (error) {
-    res.status(500).json({
-      message: "Error creating license",
+    await client.query("ROLLBACK");
+
+    const statusCode =
+      error.message === "policy must be a valid object" ||
+      error.message.startsWith("policy.")
+        ? 400
+        : 500;
+
+    res.status(statusCode).json({
+      message: statusCode === 400 ? "Invalid license policy" : "Error creating license",
       error: error.message
     });
+  } finally {
+    client.release();
   }
 };
 
@@ -55,9 +222,11 @@ export const getLicenses = async (req, res) => {
       ORDER BY id ASC
     `);
 
+    const licensesWithPolicies = await attachPoliciesToLicenses(pool, result.rows);
+
     res.status(200).json({
       message: "Licenses fetched successfully",
-      data: normalizeResponseData(result.rows)
+      data: normalizeResponseData(licensesWithPolicies)
     });
   } catch (error) {
     res.status(500).json({
@@ -70,16 +239,9 @@ export const getLicenses = async (req, res) => {
 export const getLicenseById = async (req, res) => {
   try {
     const licenseId = Number(req.params.id);
+    const licenseWithPolicy = await fetchLicenseWithPolicyById(pool, licenseId);
 
-    const result = await pool.query(
-      `
-      SELECT * FROM licenses
-      WHERE id = $1
-      `,
-      [licenseId]
-    );
-
-    if (result.rows.length === 0) {
+    if (!licenseWithPolicy) {
       return res.status(404).json({
         message: "License not found"
       });
@@ -87,7 +249,7 @@ export const getLicenseById = async (req, res) => {
 
     res.status(200).json({
       message: "License fetched successfully",
-      data: normalizeResponseData(result.rows[0])
+      data: normalizeResponseData(licenseWithPolicy)
     });
   } catch (error) {
     res.status(500).json({
@@ -98,9 +260,11 @@ export const getLicenseById = async (req, res) => {
 };
 
 export const updateLicense = async (req, res) => {
+  const client = await pool.connect();
+
   try {
     const licenseId = Number(req.params.id);
-    const { type, price, usage } = req.body;
+    const { type, price, usage, policy } = req.body;
 
     if (!type || price === undefined || !usage) {
       return res.status(400).json({
@@ -108,7 +272,9 @@ export const updateLicense = async (req, res) => {
       });
     }
 
-    const result = await pool.query(
+    await client.query("BEGIN");
+
+    const result = await client.query(
       `
       UPDATE licenses
       SET type = $1, price = $2, usage = $3
@@ -119,20 +285,44 @@ export const updateLicense = async (req, res) => {
     );
 
     if (result.rows.length === 0) {
+      await client.query("ROLLBACK");
+
       return res.status(404).json({
         message: "License not found"
       });
     }
 
+    if (Object.prototype.hasOwnProperty.call(req.body, "policy")) {
+      if (policy === null) {
+        await deleteLicensePolicy(client, licenseId);
+      } else {
+        await upsertLicensePolicy(client, licenseId, policy);
+      }
+    }
+
+    await client.query("COMMIT");
+
+    const updatedLicense = await fetchLicenseWithPolicyById(client, licenseId);
+
     res.status(200).json({
       message: "License updated successfully",
-      data: normalizeResponseData(result.rows[0])
+      data: normalizeResponseData(updatedLicense)
     });
   } catch (error) {
-    res.status(500).json({
-      message: "Error updating license",
+    await client.query("ROLLBACK");
+
+    const statusCode =
+      error.message === "policy must be a valid object" ||
+      error.message.startsWith("policy.")
+        ? 400
+        : 500;
+
+    res.status(statusCode).json({
+      message: statusCode === 400 ? "Invalid license policy" : "Error updating license",
       error: error.message
     });
+  } finally {
+    client.release();
   }
 };
 

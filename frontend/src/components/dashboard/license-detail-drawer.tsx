@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   BadgeDollarSign,
-  CalendarClock,
   LoaderCircle,
   PencilLine,
   ShieldCheck,
@@ -9,10 +8,17 @@ import {
   Trash2,
   X
 } from "lucide-react";
-import { deleteLicense, fetchLicenseById, updateLicense } from "@/services/api";
+import {
+  DEFAULT_LICENSE_POLICY,
+  getLicensePolicyInput,
+  type LicensePolicyInput
+} from "@/lib/license-policy";
+import { fetchLicenseById, updateLicense } from "@/services/api";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Asset, License, Purchase } from "@/types/api";
 import { ActionFeedback } from "@/components/dashboard/action-feedback";
+import { LicensePolicyBuilder } from "@/components/dashboard/license-policy-builder";
+import { PolicySummaryCard } from "@/components/dashboard/policy-summary-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -40,6 +46,8 @@ export function LicenseDetailDrawer({
   const [type, setType] = useState("");
   const [usage, setUsage] = useState("");
   const [price, setPrice] = useState("");
+  const [policyEnabled, setPolicyEnabled] = useState(false);
+  const [policy, setPolicy] = useState<LicensePolicyInput>(DEFAULT_LICENSE_POLICY);
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -85,6 +93,8 @@ export function LicenseDetailDrawer({
         setType(nextLicense.type);
         setUsage(nextLicense.usage);
         setPrice(String(nextLicense.price));
+        setPolicyEnabled(Boolean(nextLicense.policy));
+        setPolicy(getLicensePolicyInput(nextLicense.policy));
       } catch (loadError) {
         if (cancelled) {
           return;
@@ -146,12 +156,15 @@ export function LicenseDetailDrawer({
       const updatedLicense = await updateLicense(license.id, {
         type,
         usage,
-        price: Number(price)
+        price: Number(price),
+        policy: policyEnabled ? policy : null
       });
       setLicense(updatedLicense);
       setType(updatedLicense.type);
       setUsage(updatedLicense.usage);
       setPrice(String(updatedLicense.price));
+      setPolicyEnabled(Boolean(updatedLicense.policy));
+      setPolicy(getLicensePolicyInput(updatedLicense.policy));
       setIsEditing(false);
       setSaveFeedback("License updated successfully.");
       onLicenseUpdated(updatedLicense);
@@ -284,6 +297,8 @@ export function LicenseDetailDrawer({
                         setType(license.type);
                         setUsage(license.usage);
                         setPrice(String(license.price));
+                        setPolicyEnabled(Boolean(license.policy));
+                        setPolicy(getLicensePolicyInput(license.policy));
                         setSaveError(null);
                       }}
                     >
@@ -353,11 +368,21 @@ export function LicenseDetailDrawer({
                         required
                       />
                     </div>
+                    <LicensePolicyBuilder
+                      enabled={policyEnabled}
+                      onEnabledChange={setPolicyEnabled}
+                      value={policy}
+                      onChange={setPolicy}
+                    />
+                    <PolicySummaryCard
+                      policy={policyEnabled ? policy : null}
+                      empty={!policyEnabled}
+                    />
                     {isSaving ? (
                       <ActionFeedback
                         tone="pending"
                         message="Saving license changes"
-                        detail="The rights package is being updated against the live API."
+                        detail="The rights package and AI-native policy are being updated against the live API."
                       />
                     ) : null}
                     <div className="flex items-center justify-end gap-3 border-t border-white/8 pt-4">
@@ -369,6 +394,8 @@ export function LicenseDetailDrawer({
                           setType(license.type);
                           setUsage(license.usage);
                           setPrice(String(license.price));
+                          setPolicyEnabled(Boolean(license.policy));
+                          setPolicy(getLicensePolicyInput(license.policy));
                           setSaveError(null);
                         }}
                       >
@@ -381,6 +408,65 @@ export function LicenseDetailDrawer({
                     </div>
                   </form>
                 )}
+              </section>
+
+              <section className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
+                <div className="flex items-center gap-2 text-slate-300">
+                  <BadgeDollarSign className="h-4 w-4 text-sky-200" />
+                  <span className="text-sm font-medium">AI license policy</span>
+                </div>
+                <div className="mt-4 space-y-4">
+                  <PolicySummaryCard
+                    policy={license.policy ? getLicensePolicyInput(license.policy) : null}
+                    empty={!license.policy}
+                  />
+                  {license.policy ? (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                          Commercial use
+                        </p>
+                        <p className="mt-2 text-sm text-white">
+                          {license.policy.commercialUse ? "Allowed" : "Not allowed"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                          AI training
+                        </p>
+                        <p className="mt-2 text-sm text-white">{license.policy.aiTraining}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                          Derivative works
+                        </p>
+                        <p className="mt-2 text-sm text-white">
+                          {license.policy.derivativeWorks}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                          Attribution
+                        </p>
+                        <p className="mt-2 text-sm text-white">{license.policy.attribution}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                          Redistribution
+                        </p>
+                        <p className="mt-2 text-sm text-white">
+                          {license.policy.redistribution}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                          Scope
+                        </p>
+                        <p className="mt-2 text-sm text-white">{license.policy.licenseScope}</p>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
               </section>
 
               <section className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">

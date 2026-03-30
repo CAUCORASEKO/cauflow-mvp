@@ -1,4 +1,5 @@
 import type { ApiResponse, Asset, License, Purchase } from "@/types/api";
+import type { LicensePolicyInput } from "@/lib/license-policy";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:5001/api";
@@ -105,6 +106,7 @@ export const createLicense = async (input: {
   type: string;
   price: number;
   usage: string;
+  policy?: LicensePolicyInput | null;
 }) => {
   const response = await fetch(`${API_BASE_URL}/licenses`, {
     method: "POST",
@@ -123,6 +125,7 @@ export const updateLicense = async (
     type: string;
     price: number;
     usage: string;
+    policy?: LicensePolicyInput | null;
   }
 ) => {
   const response = await fetch(`${API_BASE_URL}/licenses/${licenseId}`, {

@@ -1,5 +1,6 @@
 import { Eye, PencilLine, Trash2 } from "lucide-react";
 import type { Asset, License, Purchase } from "@/types/api";
+import { getLicensePolicyBadges, getLicensePolicyInput } from "@/lib/license-policy";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 
@@ -46,6 +47,9 @@ export function LicenseList({
         {licenses.map((license) => {
           const isSelected = selectedLicenseId === license.id;
           const purchaseCount = purchaseCountByLicenseId.get(license.id) || 0;
+          const policyBadges = license.policy
+            ? getLicensePolicyBadges(getLicensePolicyInput(license.policy)).slice(0, 3)
+            : [];
 
           return (
           <div
@@ -70,6 +74,22 @@ export function LicenseList({
                 <p className="mt-2 text-sm text-slate-400">
                   {license.type} license for {license.usage}
                 </p>
+                {policyBadges.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {policyBadges.map((badge) => (
+                      <span
+                        key={badge}
+                        className="rounded-full border border-sky-300/15 bg-sky-300/8 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-sky-100"
+                      >
+                        {badge}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-xs uppercase tracking-[0.18em] text-slate-500">
+                    No policy configured
+                  </p>
+                )}
                 <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">
                   {purchaseCount} purchases linked
                 </p>

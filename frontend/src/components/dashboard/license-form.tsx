@@ -1,8 +1,14 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { LoaderCircle, ShieldCheck } from "lucide-react";
-import type { Asset } from "@/types/api";
+import type { Asset, License } from "@/types/api";
+import {
+  DEFAULT_LICENSE_POLICY,
+  type LicensePolicyInput
+} from "@/lib/license-policy";
 import { createLicense } from "@/services/api";
 import { ActionFeedback } from "@/components/dashboard/action-feedback";
+import { LicensePolicyBuilder } from "@/components/dashboard/license-policy-builder";
+import { PolicySummaryCard } from "@/components/dashboard/policy-summary-card";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,12 +19,14 @@ export function LicenseForm({
   onCreated
 }: {
   assets: Asset[];
-  onCreated: (license: { id: number; assetId: number; type: string; price: number; usage: string; createdAt: string }) => void | Promise<void>;
+  onCreated: (license: License) => void | Promise<void>;
 }) {
   const [assetId, setAssetId] = useState("");
   const [type, setType] = useState("standard");
   const [price, setPrice] = useState("");
   const [usage, setUsage] = useState("web");
+  const [policyEnabled, setPolicyEnabled] = useState(true);
+  const [policy, setPolicy] = useState<LicensePolicyInput>(DEFAULT_LICENSE_POLICY);
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -44,12 +52,15 @@ export function LicenseForm({
         assetId: Number(assetId),
         type,
         price: Number(price),
-        usage
+        usage,
+        policy: policyEnabled ? policy : undefined
       });
       setAssetId("");
       setType("standard");
       setPrice("");
       setUsage("web");
+      setPolicyEnabled(true);
+      setPolicy(DEFAULT_LICENSE_POLICY);
       setFeedback("License created successfully.");
       await onCreated(createdLicense);
     } catch (submissionError) {
@@ -80,62 +91,80 @@ export function LicenseForm({
         </div>
       </div>
 
-      <form className="space-y-4" onSubmit={handleSubmit}>
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-200">Source asset</label>
-          <Select
-            value={assetId}
-            onChange={(event) => setAssetId(event.target.value)}
-            required
-          >
-            <option value="">Select an asset</option>
-            {assets.map((asset) => (
-              <option key={asset.id} value={asset.id}>
-                {asset.title}
-              </option>
-            ))}
-          </Select>
-        </div>
+      <form className="space-y-5" onSubmit={handleSubmit}>
+        <section className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
+          <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
+            License basics
+          </p>
+          <div className="mt-4 space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-200">Source asset</label>
+              <Select
+                value={assetId}
+                onChange={(event) => setAssetId(event.target.value)}
+                required
+              >
+                <option value="">Select an asset</option>
+                {assets.map((asset) => (
+                  <option key={asset.id} value={asset.id}>
+                    {asset.title}
+                  </option>
+                ))}
+              </Select>
+            </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-200">License type</label>
-            <Input
-              placeholder="Standard"
-              value={type}
-              onChange={(event) => setType(event.target.value)}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-200">Usage</label>
-            <Input
-              placeholder="Web"
-              value={usage}
-              onChange={(event) => setUsage(event.target.value)}
-              required
-            />
-          </div>
-        </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-200">
+                  License type
+                </label>
+                <Input
+                  placeholder="Standard"
+                  value={type}
+                  onChange={(event) => setType(event.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-200">Usage</label>
+                <Input
+                  placeholder="Web"
+                  value={usage}
+                  onChange={(event) => setUsage(event.target.value)}
+                  required
+                />
+              </div>
+            </div>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-200">Price</label>
-          <Input
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="2500"
-            value={price}
-            onChange={(event) => setPrice(event.target.value)}
-            required
-          />
-        </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-200">Price</label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="2500"
+                value={price}
+                onChange={(event) => setPrice(event.target.value)}
+                required
+              />
+            </div>
+          </div>
+        </section>
+
+        <LicensePolicyBuilder
+          enabled={policyEnabled}
+          onEnabledChange={setPolicyEnabled}
+          value={policy}
+          onChange={setPolicy}
+        />
+
+        <PolicySummaryCard policy={policyEnabled ? policy : null} empty={!policyEnabled} />
 
         {submitting ? (
           <ActionFeedback
             tone="pending"
             message="Creating license package"
-            detail="The request is being sent to the active backend."
+            detail="The rights package and AI-native policy are being sent to the active backend."
           />
         ) : null}
         {feedback ? (

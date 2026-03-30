@@ -1,20 +1,30 @@
-const toCamelCase = (key) =>
-  key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-
-const normalizeRow = (row) => {
-  if (!row || typeof row !== "object" || Array.isArray(row)) {
-    return row;
-  }
-
-  return Object.fromEntries(
-    Object.entries(row).map(([key, value]) => [toCamelCase(key), value])
-  );
+const isPlainObject = (value) => {
+  if (value === null || typeof value !== "object") return false;
+  return Object.getPrototypeOf(value) === Object.prototype;
 };
 
-export const normalizeResponseData = (data) => {
-  if (Array.isArray(data)) {
-    return data.map(normalizeRow);
+const toCamelCase = (str) =>
+  str.replace(/_([a-z])/g, (_, char) => char.toUpperCase());
+
+export const normalizeResponseData = (value) => {
+  if (value === null || value === undefined) return value;
+
+  if (value instanceof Date) {
+    return value.toISOString();
   }
 
-  return normalizeRow(data);
+  if (Array.isArray(value)) {
+    return value.map(normalizeResponseData);
+  }
+
+  if (isPlainObject(value)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, val]) => [
+        toCamelCase(key),
+        normalizeResponseData(val),
+      ])
+    );
+  }
+
+  return value;
 };
