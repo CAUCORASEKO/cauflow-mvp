@@ -96,3 +96,73 @@ export const getPurchaseById = async (req, res) => {
     });
   }
 };
+
+export const updatePurchase = async (req, res) => {
+  try {
+    const purchaseId = Number(req.params.id);
+    const { buyerEmail, status } = req.body;
+
+    if (!buyerEmail) {
+      return res.status(400).json({
+        message: "buyerEmail is required"
+      });
+    }
+
+    const result = await pool.query(
+      `
+      UPDATE purchases
+      SET buyer_email = $1, status = COALESCE($2, status)
+      WHERE id = $3
+      RETURNING *
+      `,
+      [buyerEmail, status || null, purchaseId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        message: "Purchase not found"
+      });
+    }
+
+    res.status(200).json({
+      message: "Purchase updated successfully",
+      data: normalizeResponseData(result.rows[0])
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error updating purchase",
+      error: error.message
+    });
+  }
+};
+
+export const deletePurchase = async (req, res) => {
+  try {
+    const purchaseId = Number(req.params.id);
+
+    const result = await pool.query(
+      `
+      DELETE FROM purchases
+      WHERE id = $1
+      RETURNING *
+      `,
+      [purchaseId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        message: "Purchase not found"
+      });
+    }
+
+    res.status(200).json({
+      message: "Purchase deleted successfully",
+      data: normalizeResponseData(result.rows[0])
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error deleting purchase",
+      error: error.message
+    });
+  }
+};

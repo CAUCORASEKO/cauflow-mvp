@@ -24,9 +24,11 @@ import { AssetsGrid } from "@/components/dashboard/assets-grid";
 import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
 import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
 import { LicenseForm } from "@/components/dashboard/license-form";
+import { LicenseDetailDrawer } from "@/components/dashboard/license-detail-drawer";
 import { LicenseList } from "@/components/dashboard/license-list";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { PurchaseForm } from "@/components/dashboard/purchase-form";
+import { PurchaseDetailDrawer } from "@/components/dashboard/purchase-detail-drawer";
 import { PurchaseList } from "@/components/dashboard/purchase-list";
 import { PanelLoadingState } from "@/components/dashboard/panel-loading-state";
 import { SectionHeading } from "@/components/shared/section-heading";
@@ -34,6 +36,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
   deleteAsset,
+  deleteLicense,
+  deletePurchase,
   fetchAssets,
   fetchLicenses,
   fetchPurchases
@@ -55,6 +59,12 @@ export function DashboardPage() {
   const [selectedAssetId, setSelectedAssetId] = useState<number | null>(null);
   const [assetPendingDelete, setAssetPendingDelete] = useState<Asset | null>(null);
   const [isDeletingAsset, setIsDeletingAsset] = useState(false);
+  const [selectedLicenseId, setSelectedLicenseId] = useState<number | null>(null);
+  const [licensePendingDelete, setLicensePendingDelete] = useState<License | null>(null);
+  const [isDeletingLicense, setIsDeletingLicense] = useState(false);
+  const [selectedPurchaseId, setSelectedPurchaseId] = useState<number | null>(null);
+  const [purchasePendingDelete, setPurchasePendingDelete] = useState<Purchase | null>(null);
+  const [isDeletingPurchase, setIsDeletingPurchase] = useState(false);
   const [workspaceNotice, setWorkspaceNotice] = useState<{
     tone: "success" | "error";
     message: string;
@@ -154,6 +164,7 @@ export function DashboardPage() {
   const handleLicenseCreated = useCallback((license: License) => {
     setLicenses((currentLicenses) => [license, ...currentLicenses]);
     setSelectedAssetId(license.assetId);
+    setSelectedLicenseId(license.id);
     setLastSyncedAt(new Date());
     setWorkspaceNotice({
       tone: "success",
@@ -172,6 +183,7 @@ export function DashboardPage() {
       if (matchedLicense) {
         setSelectedAssetId(matchedLicense.assetId);
       }
+      setSelectedPurchaseId(purchase.id);
 
       setLastSyncedAt(new Date());
       setWorkspaceNotice({
@@ -196,6 +208,11 @@ export function DashboardPage() {
           .filter((license) => license.assetId === deletedAsset.id)
           .map((license) => license.id)
       );
+      const deletedPurchaseIds = new Set(
+        purchases
+          .filter((purchase) => deletedLicenseIds.has(purchase.licenseId))
+          .map((purchase) => purchase.id)
+      );
 
       setAssets((currentAssets) =>
         currentAssets.filter((asset) => asset.id !== deletedAsset.id)
@@ -210,6 +227,16 @@ export function DashboardPage() {
       );
       setSelectedAssetId((currentSelectedAssetId) =>
         currentSelectedAssetId === deletedAsset.id ? null : currentSelectedAssetId
+      );
+      setSelectedLicenseId((currentSelectedLicenseId) =>
+        currentSelectedLicenseId !== null && deletedLicenseIds.has(currentSelectedLicenseId)
+          ? null
+          : currentSelectedLicenseId
+      );
+      setSelectedPurchaseId((currentSelectedPurchaseId) =>
+        currentSelectedPurchaseId !== null && deletedPurchaseIds.has(currentSelectedPurchaseId)
+          ? null
+          : currentSelectedPurchaseId
       );
       setAssetPendingDelete(null);
       setLastSyncedAt(new Date());
@@ -228,7 +255,106 @@ export function DashboardPage() {
     } finally {
       setIsDeletingAsset(false);
     }
-  }, [assetPendingDelete, licenses]);
+  }, [assetPendingDelete, licenses, purchases]);
+
+  const handleLicenseUpdated = useCallback((updatedLicense: License) => {
+    setLicenses((currentLicenses) =>
+      currentLicenses.map((license) =>
+        license.id === updatedLicense.id ? updatedLicense : license
+      )
+    );
+    setSelectedLicenseId(updatedLicense.id);
+    setLastSyncedAt(new Date());
+  }, []);
+
+  const handlePurchaseUpdated = useCallback((updatedPurchase: Purchase) => {
+    setPurchases((currentPurchases) =>
+      currentPurchases.map((purchase) =>
+        purchase.id === updatedPurchase.id ? updatedPurchase : purchase
+      )
+    );
+    setSelectedPurchaseId(updatedPurchase.id);
+    setLastSyncedAt(new Date());
+  }, []);
+
+  const handleDeleteLicense = useCallback(async () => {
+    if (!licensePendingDelete) {
+      return;
+    }
+
+    try {
+      setIsDeletingLicense(true);
+      const deletedLicense = await deleteLicense(licensePendingDelete.id);
+
+      setLicenses((currentLicenses) =>
+        currentLicenses.filter((license) => license.id !== deletedLicense.id)
+      );
+      setPurchases((currentPurchases) =>
+        currentPurchases.filter(
+          (purchase) => purchase.licenseId !== deletedLicense.id
+        )
+      );
+      setSelectedLicenseId((currentSelectedLicenseId) =>
+        currentSelectedLicenseId === deletedLicense.id ? null : currentSelectedLicenseId
+      );
+      setSelectedPurchaseId((currentSelectedPurchaseId) => {
+        const deletedRelatedPurchase = purchases.find(
+          (purchase) =>
+            purchase.id === currentSelectedPurchaseId &&
+            purchase.licenseId === deletedLicense.id
+        );
+
+        return deletedRelatedPurchase ? null : currentSelectedPurchaseId;
+      });
+      setLicensePendingDelete(null);
+      setLastSyncedAt(new Date());
+      setWorkspaceNotice({
+        tone: "success",
+        message: "License deleted",
+        detail: "Linked purchases were removed from the workspace state as well."
+      });
+    } catch (deleteError) {
+      setWorkspaceNotice({
+        tone: "error",
+        message:
+          deleteError instanceof Error ? deleteError.message : "Unable to delete license"
+      });
+    } finally {
+      setIsDeletingLicense(false);
+    }
+  }, [licensePendingDelete, purchases]);
+
+  const handleDeletePurchase = useCallback(async () => {
+    if (!purchasePendingDelete) {
+      return;
+    }
+
+    try {
+      setIsDeletingPurchase(true);
+      const deletedPurchase = await deletePurchase(purchasePendingDelete.id);
+      setPurchases((currentPurchases) =>
+        currentPurchases.filter((purchase) => purchase.id !== deletedPurchase.id)
+      );
+      setSelectedPurchaseId((currentSelectedPurchaseId) =>
+        currentSelectedPurchaseId === deletedPurchase.id ? null : currentSelectedPurchaseId
+      );
+      setPurchasePendingDelete(null);
+      setLastSyncedAt(new Date());
+      setWorkspaceNotice({
+        tone: "success",
+        message: "Purchase deleted",
+        detail: "The transaction trail updated immediately."
+      });
+    } catch (deleteError) {
+      setWorkspaceNotice({
+        tone: "error",
+        message:
+          deleteError instanceof Error ? deleteError.message : "Unable to delete purchase"
+      });
+    } finally {
+      setIsDeletingPurchase(false);
+    }
+  }, [purchasePendingDelete]);
 
   const hasSearchFilters =
     searchQuery.trim().length > 0 || imageFilter !== "all" || sortOrder !== "newest";
@@ -433,7 +559,14 @@ export function DashboardPage() {
           {loading ? (
             <PanelLoadingState title="licenses" />
           ) : licenses.length > 0 ? (
-            <LicenseList licenses={licenses} assets={assets} />
+            <LicenseList
+              licenses={licenses}
+              assets={assets}
+              purchases={purchases}
+              selectedLicenseId={selectedLicenseId}
+              onSelectLicense={(license) => setSelectedLicenseId(license.id)}
+              onDeleteLicense={(license) => setLicensePendingDelete(license)}
+            />
           ) : (
             <Card className="p-6">
               <DashboardEmptyState
@@ -452,7 +585,14 @@ export function DashboardPage() {
           {loading ? (
             <PanelLoadingState title="purchases" />
           ) : purchases.length > 0 ? (
-            <PurchaseList purchases={purchases} licenses={licenses} />
+            <PurchaseList
+              purchases={purchases}
+              licenses={licenses}
+              assets={assets}
+              selectedPurchaseId={selectedPurchaseId}
+              onSelectPurchase={(purchase) => setSelectedPurchaseId(purchase.id)}
+              onDeletePurchase={(purchase) => setPurchasePendingDelete(purchase)}
+            />
           ) : (
             <Card className="p-6">
               <DashboardEmptyState
@@ -477,6 +617,26 @@ export function DashboardPage() {
         onAssetUpdated={handleAssetUpdated}
       />
 
+      <LicenseDetailDrawer
+        licenseId={selectedLicenseId}
+        assets={assets}
+        purchases={purchases}
+        isDeleting={isDeletingLicense}
+        onClose={() => setSelectedLicenseId(null)}
+        onDeleteRequest={(license) => setLicensePendingDelete(license)}
+        onLicenseUpdated={handleLicenseUpdated}
+      />
+
+      <PurchaseDetailDrawer
+        purchaseId={selectedPurchaseId}
+        licenses={licenses}
+        assets={assets}
+        isDeleting={isDeletingPurchase}
+        onClose={() => setSelectedPurchaseId(null)}
+        onDeleteRequest={(purchase) => setPurchasePendingDelete(purchase)}
+        onPurchaseUpdated={handlePurchaseUpdated}
+      />
+
       <ConfirmDialog
         open={Boolean(assetPendingDelete)}
         title={assetPendingDelete ? `Delete ${assetPendingDelete.title}?` : "Delete asset?"}
@@ -489,6 +649,42 @@ export function DashboardPage() {
           }
         }}
         onConfirm={() => void handleDeleteAsset()}
+      />
+
+      <ConfirmDialog
+        open={Boolean(licensePendingDelete)}
+        title={
+          licensePendingDelete
+            ? `Delete ${licensePendingDelete.type} license?`
+            : "Delete license?"
+        }
+        description="This will remove the license and cascade through any linked purchases. The action cannot be undone."
+        confirmLabel="Delete license"
+        isConfirming={isDeletingLicense}
+        onClose={() => {
+          if (!isDeletingLicense) {
+            setLicensePendingDelete(null);
+          }
+        }}
+        onConfirm={() => void handleDeleteLicense()}
+      />
+
+      <ConfirmDialog
+        open={Boolean(purchasePendingDelete)}
+        title={
+          purchasePendingDelete
+            ? `Delete purchase #${purchasePendingDelete.id}?`
+            : "Delete purchase?"
+        }
+        description="This removes the transaction record from the purchase trail. The action cannot be undone."
+        confirmLabel="Delete purchase"
+        isConfirming={isDeletingPurchase}
+        onClose={() => {
+          if (!isDeletingPurchase) {
+            setPurchasePendingDelete(null);
+          }
+        }}
+        onConfirm={() => void handleDeletePurchase()}
       />
     </DashboardShell>
   );

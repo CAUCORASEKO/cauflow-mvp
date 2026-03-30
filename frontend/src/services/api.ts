@@ -95,6 +95,11 @@ export const fetchLicenses = async () => {
   return handleResponse<License[]>(response);
 };
 
+export const fetchLicenseById = async (licenseId: number) => {
+  const response = await fetch(`${API_BASE_URL}/licenses/${licenseId}`);
+  return handleResponse<License>(response);
+};
+
 export const createLicense = async (input: {
   assetId: number;
   type: string;
@@ -112,9 +117,41 @@ export const createLicense = async (input: {
   return handleResponse<License>(response);
 };
 
+export const updateLicense = async (
+  licenseId: number,
+  input: {
+    type: string;
+    price: number;
+    usage: string;
+  }
+) => {
+  const response = await fetch(`${API_BASE_URL}/licenses/${licenseId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(input)
+  });
+
+  return handleResponse<License>(response);
+};
+
+export const deleteLicense = async (licenseId: number) => {
+  const response = await fetch(`${API_BASE_URL}/licenses/${licenseId}`, {
+    method: "DELETE"
+  });
+
+  return handleResponse<License>(response);
+};
+
 export const fetchPurchases = async () => {
   const response = await fetch(`${API_BASE_URL}/purchases`);
   return handleResponse<Purchase[]>(response);
+};
+
+export const fetchPurchaseById = async (purchaseId: number) => {
+  const response = await fetch(`${API_BASE_URL}/purchases/${purchaseId}`);
+  return handleResponse<Purchase>(response);
 };
 
 export const createPurchase = async (input: {
@@ -127,6 +164,32 @@ export const createPurchase = async (input: {
       "Content-Type": "application/json"
     },
     body: JSON.stringify(input)
+  });
+
+  return handleResponse<Purchase>(response);
+};
+
+export const updatePurchase = async (
+  purchaseId: number,
+  input: {
+    buyerEmail: string;
+    status?: string;
+  }
+) => {
+  const response = await fetch(`${API_BASE_URL}/purchases/${purchaseId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(input)
+  });
+
+  return handleResponse<Purchase>(response);
+};
+
+export const deletePurchase = async (purchaseId: number) => {
+  const response = await fetch(`${API_BASE_URL}/purchases/${purchaseId}`, {
+    method: "DELETE"
   });
 
   return handleResponse<Purchase>(response);

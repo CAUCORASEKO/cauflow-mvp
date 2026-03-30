@@ -96,3 +96,73 @@ export const getLicenseById = async (req, res) => {
     });
   }
 };
+
+export const updateLicense = async (req, res) => {
+  try {
+    const licenseId = Number(req.params.id);
+    const { type, price, usage } = req.body;
+
+    if (!type || price === undefined || !usage) {
+      return res.status(400).json({
+        message: "type, price and usage are required"
+      });
+    }
+
+    const result = await pool.query(
+      `
+      UPDATE licenses
+      SET type = $1, price = $2, usage = $3
+      WHERE id = $4
+      RETURNING *
+      `,
+      [type, price, usage, licenseId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        message: "License not found"
+      });
+    }
+
+    res.status(200).json({
+      message: "License updated successfully",
+      data: normalizeResponseData(result.rows[0])
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error updating license",
+      error: error.message
+    });
+  }
+};
+
+export const deleteLicense = async (req, res) => {
+  try {
+    const licenseId = Number(req.params.id);
+
+    const result = await pool.query(
+      `
+      DELETE FROM licenses
+      WHERE id = $1
+      RETURNING *
+      `,
+      [licenseId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        message: "License not found"
+      });
+    }
+
+    res.status(200).json({
+      message: "License deleted successfully",
+      data: normalizeResponseData(result.rows[0])
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error deleting license",
+      error: error.message
+    });
+  }
+};
