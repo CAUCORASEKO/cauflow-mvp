@@ -32,6 +32,11 @@ export const fetchAssets = async () => {
   return handleResponse<Asset[]>(response);
 };
 
+export const fetchAssetById = async (assetId: number) => {
+  const response = await fetch(`${API_BASE_URL}/assets/${assetId}`);
+  return handleResponse<Asset>(response);
+};
+
 export const createAsset = async (input: {
   title: string;
   description: string;
@@ -47,6 +52,38 @@ export const createAsset = async (input: {
 
   const response = await fetch(`${API_BASE_URL}/assets`, {
     method: "POST",
+    body: formData
+  });
+
+  return handleResponse<Asset>(response);
+};
+
+export const deleteAsset = async (assetId: number) => {
+  const response = await fetch(`${API_BASE_URL}/assets/${assetId}`, {
+    method: "DELETE"
+  });
+
+  return handleResponse<Asset>(response);
+};
+
+export const updateAsset = async (
+  assetId: number,
+  input: {
+    title: string;
+    description: string;
+    image?: File | null;
+  }
+) => {
+  const formData = new FormData();
+  formData.append("title", input.title);
+  formData.append("description", input.description);
+
+  if (input.image) {
+    formData.append("image", input.image);
+  }
+
+  const response = await fetch(`${API_BASE_URL}/assets/${assetId}`, {
+    method: "PATCH",
     body: formData
   });
 

@@ -13,7 +13,7 @@ export function LicenseForm({
   onCreated
 }: {
   assets: Asset[];
-  onCreated: () => Promise<void>;
+  onCreated: (license: { id: number; assetId: number; type: string; price: number; usage: string; createdAt: string }) => void | Promise<void>;
 }) {
   const [assetId, setAssetId] = useState("");
   const [type, setType] = useState("standard");
@@ -40,7 +40,7 @@ export function LicenseForm({
     setError(null);
 
     try {
-      await createLicense({
+      const createdLicense = await createLicense({
         assetId: Number(assetId),
         type,
         price: Number(price),
@@ -51,7 +51,7 @@ export function LicenseForm({
       setPrice("");
       setUsage("web");
       setFeedback("License created successfully.");
-      await onCreated();
+      await onCreated(createdLicense);
     } catch (submissionError) {
       setError(
         submissionError instanceof Error
@@ -142,7 +142,7 @@ export function LicenseForm({
           <ActionFeedback
             tone="success"
             message={feedback}
-            detail="The new package becomes available in the live purchase flow after refresh."
+            detail="The new package is available in the purchase flow immediately."
           />
         ) : null}
         {error ? <ActionFeedback tone="error" message={error} /> : null}

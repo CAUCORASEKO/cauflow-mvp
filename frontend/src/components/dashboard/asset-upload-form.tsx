@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 export function AssetUploadForm({
   onCreated
 }: {
-  onCreated: () => Promise<void>;
+  onCreated: (asset: { id: number; title: string; description: string | null; imageUrl: string | null; createdAt: string }) => void | Promise<void>;
 }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -62,12 +62,12 @@ export function AssetUploadForm({
     setFeedback(null);
 
     try {
-      await createAsset({ title, description, image });
+      const createdAsset = await createAsset({ title, description, image });
       setTitle("");
       setDescription("");
       setImage(null);
       setFeedback("Asset created successfully.");
-      await onCreated();
+      await onCreated(createdAsset);
     } catch (submissionError) {
       setError(
         submissionError instanceof Error

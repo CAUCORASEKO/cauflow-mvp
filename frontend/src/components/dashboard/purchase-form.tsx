@@ -14,7 +14,7 @@ export function PurchaseForm({
   onCreated
 }: {
   licenses: License[];
-  onCreated: () => Promise<void>;
+  onCreated: (purchase: { id: number; licenseId: number; buyerEmail: string; status: string; createdAt: string }) => void | Promise<void>;
 }) {
   const [licenseId, setLicenseId] = useState("");
   const [buyerEmail, setBuyerEmail] = useState("");
@@ -39,11 +39,14 @@ export function PurchaseForm({
     setError(null);
 
     try {
-      await createPurchase({ licenseId: Number(licenseId), buyerEmail });
+      const createdPurchase = await createPurchase({
+        licenseId: Number(licenseId),
+        buyerEmail
+      });
       setLicenseId("");
       setBuyerEmail("");
       setFeedback("Purchase recorded successfully.");
-      await onCreated();
+      await onCreated(createdPurchase);
     } catch (submissionError) {
       setError(
         submissionError instanceof Error
@@ -112,7 +115,7 @@ export function PurchaseForm({
           <ActionFeedback
             tone="success"
             message={feedback}
-            detail="Revenue surfaces update after the live refresh completes."
+            detail="Revenue surfaces and relationship cues update immediately."
           />
         ) : null}
         {error ? <ActionFeedback tone="error" message={error} /> : null}
