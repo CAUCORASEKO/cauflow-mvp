@@ -27,6 +27,13 @@ const navItems = [
   { label: "Purchases", icon: CreditCard, href: "#purchases" }
 ];
 
+const pulseMetrics = [
+  { label: "Assets", valueKey: "assets" },
+  { label: "Licenses", valueKey: "licenses" },
+  { label: "Sales", valueKey: "purchases" },
+  { label: "Revenue", valueKey: "revenue" }
+] as const;
+
 export function DashboardShell({
   children,
   assetsCount,
@@ -88,32 +95,30 @@ export function DashboardShell({
               </div>
 
               <div className="mt-3 grid grid-cols-2 gap-2">
-                <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
-                    Assets
-                  </p>
-                  <p className="mt-1 text-lg font-semibold text-white">{assetsCount}</p>
-                </div>
-                <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
-                    Licenses
-                  </p>
-                  <p className="mt-1 text-lg font-semibold text-white">{licensesCount}</p>
-                </div>
-                <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
-                    Purchases
-                  </p>
-                  <p className="mt-1 text-lg font-semibold text-white">{purchasesCount}</p>
-                </div>
-                <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
-                    Revenue
-                  </p>
-                  <p className="mt-1 truncate text-lg font-semibold text-white">
-                    {formatCurrency(totalRevenue)}
-                  </p>
-                </div>
+                {pulseMetrics.map(({ label, valueKey }) => {
+                  const value =
+                    valueKey === "assets"
+                      ? assetsCount
+                      : valueKey === "licenses"
+                        ? licensesCount
+                        : valueKey === "purchases"
+                          ? purchasesCount
+                          : formatCurrency(totalRevenue);
+
+                  return (
+                    <div
+                      key={label}
+                      className="flex min-h-[76px] flex-col justify-between rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2.5"
+                    >
+                      <p className="max-w-full text-[11px] font-medium leading-4 text-slate-400">
+                        {label}
+                      </p>
+                      <p className="mt-2 truncate text-lg font-semibold leading-none text-white">
+                        {value}
+                      </p>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

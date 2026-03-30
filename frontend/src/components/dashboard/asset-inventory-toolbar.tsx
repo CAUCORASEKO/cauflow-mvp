@@ -1,4 +1,4 @@
-import { Grid2X2, ImageIcon, List, Search, SlidersHorizontal } from "lucide-react";
+import { Grid2X2, List, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -66,29 +66,25 @@ export function AssetInventoryToolbar({
           </div>
         </div>
 
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1.2fr),220px,180px,auto]">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+        <div className="flex flex-col gap-3 xl:flex-row xl:flex-wrap xl:items-center">
+          <div className="min-w-0 xl:min-w-[280px] xl:flex-[1.15_1_0%]">
             <Input
               value={searchQuery}
               onChange={(event) => onSearchQueryChange(event.target.value)}
               placeholder="Search by asset title or description"
-              className="pl-11"
             />
           </div>
-          <div className="relative">
-            <ImageIcon className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          <div className="xl:w-[220px] xl:flex-none">
             <Select
               value={imageFilter}
               onChange={(event) => onImageFilterChange(event.target.value as AssetImageFilter)}
-              className="pl-11"
             >
               <option value="all">All assets</option>
               <option value="with-image">With preview</option>
               <option value="without-image">Without preview</option>
             </Select>
           </div>
-          <div className="relative">
+          <div className="relative xl:w-[180px] xl:flex-none">
             <SlidersHorizontal className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
             <Select
               value={sortOrder}
@@ -102,7 +98,7 @@ export function AssetInventoryToolbar({
           <Button
             type="button"
             variant="ghost"
-            className="justify-center rounded-2xl border border-white/10 px-4 py-3 text-sm"
+            className="justify-center rounded-2xl border border-white/10 px-4 py-3 text-sm xl:flex-none"
             onClick={() => {
               onSearchQueryChange("");
               onImageFilterChange("all");
