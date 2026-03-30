@@ -1,4 +1,4 @@
-import type { PropsWithChildren } from "react";
+import { useEffect, useState, type PropsWithChildren } from "react";
 import {
   Activity,
   Boxes,
@@ -35,6 +35,19 @@ export function DashboardShell({
   totalRevenue,
   hasError
 }: DashboardShellProps) {
+  const [activeHash, setActiveHash] = useState(() => window.location.hash || "#overview");
+
+  useEffect(() => {
+    const syncHash = () => {
+      setActiveHash(window.location.hash || "#overview");
+    };
+
+    syncHash();
+    window.addEventListener("hashchange", syncHash);
+
+    return () => window.removeEventListener("hashchange", syncHash);
+  }, []);
+
   return (
     <div className="min-h-screen bg-mesh">
       <div className="shell py-4 md:py-5 lg:py-6">
@@ -49,7 +62,7 @@ export function DashboardShell({
                   <p className="font-display text-lg font-semibold text-white">
                     CauFlow
                   </p>
-                  <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-200">
+                  <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-200 shadow-[0_0_0_1px_rgba(52,211,153,0.06)]">
                     Live
                   </span>
                 </div>
@@ -113,32 +126,49 @@ export function DashboardShell({
                   <a
                     key={label}
                     href={href}
-                    className="group flex items-center justify-between rounded-2xl border border-white/5 bg-white/[0.02] px-3 py-2.5 text-sm text-slate-300 transition hover:border-white/10 hover:bg-white/[0.05] hover:text-white"
+                    className={`focus-ring group flex items-center justify-between rounded-2xl border px-3 py-2.5 text-sm transition-all duration-200 ${
+                      activeHash === href
+                        ? "border-sky-300/18 bg-sky-300/[0.09] text-white shadow-[0_16px_32px_rgba(14,165,233,0.1)]"
+                        : "border-white/5 bg-white/[0.02] text-slate-300 hover:-translate-y-px hover:border-white/10 hover:bg-white/[0.05] hover:text-white"
+                    }`}
                   >
                     <span className="flex items-center gap-3">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/5 text-sky-200 transition group-hover:bg-sky-300/10">
+                      <span
+                        className={`flex h-8 w-8 items-center justify-center rounded-xl text-sky-200 transition-all duration-200 ${
+                          activeHash === href
+                            ? "bg-sky-300/14 shadow-[0_10px_24px_rgba(14,165,233,0.12)]"
+                            : "bg-white/5 group-hover:bg-sky-300/10"
+                        }`}
+                      >
                         <Icon className="h-4 w-4" />
                       </span>
                       {label}
                     </span>
-                    <Activity className="h-3.5 w-3.5 text-slate-600 transition group-hover:text-slate-300" />
+                    <Activity
+                      className={`h-3.5 w-3.5 transition ${
+                        activeHash === href
+                          ? "text-sky-200"
+                          : "text-slate-600 group-hover:text-slate-300"
+                      }`}
+                    />
                   </a>
                 ))}
               </nav>
             </div>
 
             <div className="mt-4 grid gap-3">
-              <div className="rounded-[24px] border border-sky-300/10 bg-sky-300/5 p-3.5 xl:p-4">
+              <div className="surface-highlight rounded-[24px] border border-sky-300/10 bg-sky-300/5 p-3.5 xl:p-4">
                 <div className="mb-2 flex items-center gap-2 text-sky-200">
                   <Sparkles className="h-4 w-4" />
                   <span className="text-sm font-semibold">Live backend mode</span>
+                  <span className="ml-auto h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_18px_rgba(110,231,183,0.9)]" />
                 </div>
                 <p className="text-sm leading-6 text-slate-300">
                   Reads and writes against the active CauFlow API without mock data.
                 </p>
               </div>
 
-              <div className="rounded-[24px] border border-white/8 bg-white/[0.025] p-3.5 xl:p-4">
+              <div className="surface-highlight rounded-[24px] border border-white/8 bg-white/[0.025] p-3.5 xl:p-4">
                 <div className="mb-2 flex items-center gap-2 text-white">
                   <LifeBuoy className="h-4 w-4 text-slate-300" />
                   <span className="text-sm font-semibold">Operator notes</span>

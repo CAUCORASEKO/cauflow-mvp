@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
-import { ArrowUpRight, Boxes, CreditCard, RefreshCcw, ShieldCheck } from "lucide-react";
+import {
+  ArrowUpRight,
+  Boxes,
+  CreditCard,
+  FolderOpen,
+  RefreshCcw,
+  ShieldCheck,
+  ShoppingCart
+} from "lucide-react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
 import { AssetUploadForm } from "@/components/dashboard/asset-upload-form";
 import { AssetsGrid } from "@/components/dashboard/assets-grid";
 import { LicenseForm } from "@/components/dashboard/license-form";
@@ -62,7 +71,7 @@ export function DashboardPage() {
     >
       <section
         id="overview"
-        className="glass-panel rounded-[30px] border border-white/10 p-5 md:p-6 xl:p-7"
+        className="glass-panel surface-highlight rounded-[30px] border border-white/10 p-5 md:p-6 xl:p-7"
       >
         <div className="grid gap-4 lg:gap-5 xl:gap-6 lg:grid-cols-[minmax(0,1.2fr),minmax(320px,0.84fr)] 2xl:grid-cols-[minmax(0,1.28fr),390px]">
           <div className="max-w-3xl self-start">
@@ -79,7 +88,7 @@ export function DashboardPage() {
           </div>
 
           <div className="grid w-full gap-3 self-start sm:grid-cols-2">
-            <div className="rounded-[24px] border border-white/10 bg-black/20 p-4 sm:col-span-2">
+            <div className="surface-highlight rounded-[24px] border border-white/10 bg-black/20 p-4 sm:col-span-2">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
@@ -87,7 +96,7 @@ export function DashboardPage() {
                   </p>
                   <div className="mt-2 flex items-center gap-2.5">
                     <div
-                      className={`h-2.5 w-2.5 rounded-full ${
+                      className={`h-2.5 w-2.5 rounded-full shadow-[0_0_18px_currentColor] ${
                         error ? "bg-rose-300" : "bg-emerald-400"
                       }`}
                     />
@@ -100,9 +109,11 @@ export function DashboardPage() {
                   variant="secondary"
                   onClick={() => void loadDashboard()}
                   className="gap-2 px-4 py-2.5"
+                  disabled={loading}
+                  aria-busy={loading}
                 >
-                  <RefreshCcw className="h-4 w-4" />
-                  Refresh
+                  <RefreshCcw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                  {loading ? "Refreshing..." : "Refresh"}
                 </Button>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] uppercase tracking-[0.18em] text-slate-500">
@@ -120,7 +131,7 @@ export function DashboardPage() {
               </div>
             </div>
 
-            <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-3.5 xl:p-4">
+            <div className="surface-highlight rounded-[24px] border border-white/10 bg-white/[0.03] p-3.5 xl:p-4 transition-all duration-300 hover:border-white/14 hover:bg-white/[0.05]">
               <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
                 Focus
               </p>
@@ -128,7 +139,7 @@ export function DashboardPage() {
                 Build clean licensable inventory
               </p>
             </div>
-            <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-3.5 xl:p-4">
+            <div className="surface-highlight rounded-[24px] border border-white/10 bg-white/[0.03] p-3.5 xl:p-4 transition-all duration-300 hover:border-white/14 hover:bg-white/[0.05]">
               <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
                 Flow health
               </p>
@@ -142,7 +153,7 @@ export function DashboardPage() {
       </section>
 
       {error ? (
-        <Card className="border border-rose-400/20 bg-rose-400/5 p-5">
+        <Card className="surface-highlight border border-rose-400/20 bg-rose-400/5 p-5">
           <p className="font-semibold text-rose-200">Unable to load dashboard data</p>
           <p className="mt-2 text-sm text-rose-100/80">{error}</p>
         </Card>
@@ -176,7 +187,7 @@ export function DashboardPage() {
         <div className="xl:sticky xl:top-4 2xl:top-5 xl:self-start">
           <AssetUploadForm onCreated={loadDashboard} />
         </div>
-        <Card className="p-6 md:p-7">
+        <Card className="surface-highlight p-6 md:p-7">
           <SectionHeading
             eyebrow="Assets"
             title="Visual inventory"
@@ -188,9 +199,13 @@ export function DashboardPage() {
             ) : assets.length > 0 ? (
               <AssetsGrid assets={assets} />
             ) : (
-              <p className="text-sm text-slate-400">
-                No assets yet. Upload the first asset to populate the catalog.
-              </p>
+              <DashboardEmptyState
+                icon={FolderOpen}
+                eyebrow="Inventory empty"
+                title="Your asset catalog is ready for its first upload"
+                copy="Once an image is added, CauFlow turns it into a visible inventory card with metadata, timestamps, and downstream licensing context."
+                hint="Use the asset intake panel to seed the catalog"
+              />
             )}
           </div>
         </Card>
@@ -200,17 +215,20 @@ export function DashboardPage() {
         <div id="licenses" className="space-y-6">
           <LicenseForm assets={assets} onCreated={loadDashboard} />
           {loading ? (
-            <Card className="p-6">
+            <Card className="surface-highlight p-6">
               <p className="text-sm text-slate-400">Loading licenses...</p>
             </Card>
           ) : licenses.length > 0 ? (
             <LicenseList licenses={licenses} assets={assets} />
           ) : (
             <Card className="p-6">
-              <p className="font-display text-2xl text-white">Licenses</p>
-              <p className="mt-3 text-sm text-slate-400">
-                No licenses yet. Create one from an existing asset.
-              </p>
+              <DashboardEmptyState
+                icon={ShieldCheck}
+                eyebrow="No packages yet"
+                title="License packages will appear here once rights are defined"
+                copy="Create a package from an uploaded asset to establish usage scope, pricing, and the record buyers will transact against."
+                hint="Create the first rights package from the form above"
+              />
             </Card>
           )}
         </div>
@@ -218,17 +236,20 @@ export function DashboardPage() {
         <div id="purchases" className="space-y-6">
           <PurchaseForm licenses={licenses} onCreated={loadDashboard} />
           {loading ? (
-            <Card className="p-6">
+            <Card className="surface-highlight p-6">
               <p className="text-sm text-slate-400">Loading purchases...</p>
             </Card>
           ) : purchases.length > 0 ? (
             <PurchaseList purchases={purchases} licenses={licenses} />
           ) : (
             <Card className="p-6">
-              <p className="font-display text-2xl text-white">Purchases</p>
-              <p className="mt-3 text-sm text-slate-400">
-                No purchases yet. Record a purchase against any created license.
-              </p>
+              <DashboardEmptyState
+                icon={ShoppingCart}
+                eyebrow="No transactions yet"
+                title="Recorded purchases will build the commercial trail here"
+                copy="After a license exists, each purchase entry adds buyer identity, linked package data, and a cleaner revenue signal across the workspace."
+                hint="Use the transaction form to log the first purchase"
+              />
             </Card>
           )}
         </div>

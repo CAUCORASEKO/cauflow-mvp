@@ -29,6 +29,11 @@
   a {
     @apply text-inherit no-underline;
   }
+
+  ::selection {
+    background: rgba(125, 211, 252, 0.24);
+    color: #f8fafc;
+  }
 }
 
 @layer components {
@@ -39,6 +44,37 @@
   .glass-panel {
     @apply border border-white/10 bg-white/[0.04] backdrop-blur-xl;
     box-shadow: 0 20px 70px rgba(2, 8, 23, 0.4);
+  }
+
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950;
+  }
+
+  .surface-highlight {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .surface-highlight::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    background: linear-gradient(
+      135deg,
+      rgba(125, 211, 252, 0.08),
+      transparent 32%,
+      transparent 68%,
+      rgba(255, 255, 255, 0.05)
+    );
+    opacity: 0;
+    transition: opacity 220ms ease;
+  }
+
+  .surface-highlight:hover::after,
+  .surface-highlight:focus-within::after {
+    opacity: 1;
   }
 
   .section-title {

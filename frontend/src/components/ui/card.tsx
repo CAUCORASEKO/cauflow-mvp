@@ -9,7 +9,7 @@ export function Card({
   return (
     <div
       className={cn(
-        "glass-panel rounded-3xl border border-white/10 bg-slate-950/60",
+        "glass-panel rounded-3xl border border-white/10 bg-slate-950/60 transition-[border-color,transform,box-shadow,background-color] duration-300 ease-out",
         className
       )}
       {...props}

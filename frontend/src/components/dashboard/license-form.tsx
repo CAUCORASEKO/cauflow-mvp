@@ -1,7 +1,8 @@
-import { useState, type FormEvent } from "react";
-import { ShieldCheck } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
+import { LoaderCircle, ShieldCheck } from "lucide-react";
 import type { Asset } from "@/types/api";
 import { createLicense } from "@/services/api";
+import { ActionFeedback } from "@/components/dashboard/action-feedback";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,16 @@ export function LicenseForm({
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!feedback) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => setFeedback(null), 3200);
+
+    return () => window.clearTimeout(timeout);
+  }, [feedback]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -53,7 +64,7 @@ export function LicenseForm({
   };
 
   return (
-    <Card className="p-6">
+    <Card className="surface-highlight p-6">
       <div className="mb-6 flex items-start gap-4">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/8 bg-white/5 text-sky-200">
           <ShieldCheck className="h-5 w-5" />
@@ -120,8 +131,21 @@ export function LicenseForm({
           />
         </div>
 
-        {feedback ? <p className="text-sm text-emerald-300">{feedback}</p> : null}
-        {error ? <p className="text-sm text-rose-300">{error}</p> : null}
+        {submitting ? (
+          <ActionFeedback
+            tone="pending"
+            message="Creating license package"
+            detail="The request is being sent to the active backend."
+          />
+        ) : null}
+        {feedback ? (
+          <ActionFeedback
+            tone="success"
+            message={feedback}
+            detail="The new package becomes available in the live purchase flow after refresh."
+          />
+        ) : null}
+        {error ? <ActionFeedback tone="error" message={error} /> : null}
 
         <div className="flex items-center justify-between gap-3 border-t border-white/8 pt-4">
           <p className="text-sm text-slate-400">
@@ -131,8 +155,10 @@ export function LicenseForm({
             type="submit"
             variant="secondary"
             disabled={submitting || assets.length === 0}
-            className="min-w-[168px]"
+            className="min-w-[168px] gap-2"
+            aria-busy={submitting}
           >
+            {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
             {submitting ? "Creating license..." : "Create license"}
           </Button>
         </div>

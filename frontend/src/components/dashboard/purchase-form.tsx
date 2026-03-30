@@ -1,8 +1,9 @@
-import { useState, type FormEvent } from "react";
-import { CreditCard } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
+import { CreditCard, LoaderCircle } from "lucide-react";
 import type { License } from "@/types/api";
 import { createPurchase } from "@/services/api";
 import { formatCurrency } from "@/lib/utils";
+import { ActionFeedback } from "@/components/dashboard/action-feedback";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,16 @@ export function PurchaseForm({
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!feedback) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => setFeedback(null), 3200);
+
+    return () => window.clearTimeout(timeout);
+  }, [feedback]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -45,7 +56,7 @@ export function PurchaseForm({
   };
 
   return (
-    <Card className="p-6">
+    <Card className="surface-highlight p-6">
       <div className="mb-6 flex items-start gap-4">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/8 bg-white/5 text-sky-200">
           <CreditCard className="h-5 w-5" />
@@ -90,8 +101,21 @@ export function PurchaseForm({
           />
         </div>
 
-        {feedback ? <p className="text-sm text-emerald-300">{feedback}</p> : null}
-        {error ? <p className="text-sm text-rose-300">{error}</p> : null}
+        {submitting ? (
+          <ActionFeedback
+            tone="pending"
+            message="Recording purchase"
+            detail="The transaction is being written through the current purchase endpoint."
+          />
+        ) : null}
+        {feedback ? (
+          <ActionFeedback
+            tone="success"
+            message={feedback}
+            detail="Revenue surfaces update after the live refresh completes."
+          />
+        ) : null}
+        {error ? <ActionFeedback tone="error" message={error} /> : null}
 
         <div className="flex items-center justify-between gap-3 border-t border-white/8 pt-4">
           <p className="text-sm text-slate-400">
@@ -101,8 +125,10 @@ export function PurchaseForm({
             type="submit"
             variant="secondary"
             disabled={submitting || licenses.length === 0}
-            className="min-w-[176px]"
+            className="min-w-[176px] gap-2"
+            aria-busy={submitting}
           >
+            {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
             {submitting ? "Creating purchase..." : "Create purchase"}
           </Button>
         </div>

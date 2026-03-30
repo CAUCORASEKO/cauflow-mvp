@@ -13,7 +13,8 @@ export function AssetsGrid({ assets }: { assets: Asset[] }) {
         return (
           <Card
             key={asset.id}
-            className="group overflow-hidden border-white/8 bg-slate-950/50 transition duration-300 hover:-translate-y-0.5 hover:border-white/15"
+            tabIndex={0}
+            className="surface-highlight group overflow-hidden border-white/8 bg-slate-950/50 hover:-translate-y-1 hover:border-white/15 hover:bg-slate-950/70 hover:shadow-[0_24px_55px_rgba(2,8,23,0.35)] focus-visible:border-sky-300/35 focus-visible:shadow-[0_0_0_1px_rgba(125,211,252,0.2),0_24px_55px_rgba(2,8,23,0.35)] focus-visible:outline-none"
           >
             <div className="relative aspect-[5/4] overflow-hidden border-b border-white/10 bg-slate-900">
               <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-slate-950 via-slate-950/10 to-transparent" />
@@ -21,7 +22,7 @@ export function AssetsGrid({ assets }: { assets: Asset[] }) {
                 <img
                   src={imageUrl}
                   alt={asset.title}
-                  className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+                  className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03] group-focus-visible:scale-[1.03]"
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-800 to-slate-950 text-slate-500">
@@ -48,7 +49,7 @@ export function AssetsGrid({ assets }: { assets: Asset[] }) {
                 <span className="text-xs uppercase tracking-[0.18em] text-slate-500">
                   Visual preview
                 </span>
-                <span className="rounded-full border border-sky-300/15 bg-sky-300/8 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-sky-100">
+                <span className="rounded-full border border-sky-300/15 bg-sky-300/8 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-sky-100 transition-all duration-300 group-hover:border-sky-300/25 group-hover:bg-sky-300/12">
                   Inventory ready
                 </span>
               </div>
