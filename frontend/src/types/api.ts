@@ -4,6 +4,7 @@ export interface Asset {
   description: string | null;
   imageUrl: string | null;
   createdAt: string;
+  ownerUserId?: number | null;
 }
 
 export interface LicensePolicy {
@@ -29,6 +30,7 @@ export interface License {
   price: number;
   usage: string;
   createdAt: string;
+  ownerUserId?: number | null;
   policy?: LicensePolicy | null;
 }
 
@@ -38,10 +40,145 @@ export interface Purchase {
   buyerEmail: string;
   status: string;
   createdAt: string;
+  buyerUserId?: number | null;
+  creatorUserId?: number | null;
+  assetId?: number | null;
+  packId?: number | null;
+  paymentStatus?: PaymentStatus;
+}
+
+export type PackStatus = "draft" | "published";
+
+export type PackCategory =
+  | "visual"
+  | "brand"
+  | "character"
+  | "concept"
+  | "dataset"
+  | "prompt"
+  | "mixed";
+
+export interface PackAssetItem {
+  id: number;
+  packId: number;
+  assetId: number;
+  position: number;
+  createdAt: string;
+  asset: Asset;
+}
+
+export interface Pack {
+  id: number;
+  title: string;
+  description: string;
+  coverAssetId: number;
+  price: number;
+  status: PackStatus;
+  category: PackCategory;
+  licenseId: number | null;
+  createdAt: string;
+  updatedAt: string;
+  assetCount: number;
+  coverAsset: Asset | null;
+  license: License | null;
+  assets?: PackAssetItem[];
+  ownerUserId?: number | null;
+}
+
+export type UserRole = "creator" | "buyer" | "admin";
+
+export type AccountStatus = "active" | "suspended" | "restricted";
+
+export type PayoutOnboardingStatus =
+  | "not_started"
+  | "pending"
+  | "active"
+  | "restricted"
+  | "disabled";
+
+export type WalletConnectionStatus = "disconnected" | "connected";
+
+export interface Account {
+  id: number;
+  email: string;
+  role: UserRole;
+  accountStatus: AccountStatus;
+  emailVerified: boolean;
+  publicDisplayName: string | null;
+  avatarUrl: string | null;
+  organizationName: string | null;
+  studioName: string | null;
+  country: string | null;
+  preferredCurrency: string | null;
+  walletAddress: string | null;
+  walletConnectionStatus: WalletConnectionStatus;
+  onboardingCompleted?: boolean;
+  payoutOnboardingStatus: PayoutOnboardingStatus;
+  defaultLicenseType: string | null;
+  defaultLicenseUsage: string | null;
+  defaultPrice: number | null;
+  taxReference: string | null;
+  stripeConnectAccountId: string | null;
+  creatorReady: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type PaymentStatus = "pending" | "paid" | "failed" | "refunded" | "canceled";
+
+export interface PaymentRecord {
+  id: number;
+  buyerUserId: number;
+  creatorUserId: number | null;
+  assetId: number | null;
+  packId: number | null;
+  licenseId: number | null;
+  purchaseId: number | null;
+  provider: string;
+  providerSessionId: string;
+  amount: number;
+  currency: string;
+  status: PaymentStatus;
+  receiptUrl: string | null;
+  checkoutUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LicenseGrant {
+  id: number;
+  purchaseId: number;
+  buyerUserId: number;
+  creatorUserId: number | null;
+  licenseId: number;
+  assetId: number | null;
+  packId: number | null;
+  status: "active" | "expired" | "revoked";
+  downloadAccess: boolean;
+  expiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExploreFeed {
+  assets: Asset[];
+  packs: Pack[];
+  licenses: License[];
+}
+
+export interface RoleDashboard {
+  role: UserRole;
+  account: Account;
+  metrics: Record<string, number>;
+  payoutStatus?: PayoutOnboardingStatus;
+  recentPurchases?: Purchase[];
+  recentPayments?: PaymentRecord[];
+  quickActions: string[];
 }
 
 export interface ApiResponse<T> {
   message: string;
   data: T;
   error?: string;
+  code?: string;
 }

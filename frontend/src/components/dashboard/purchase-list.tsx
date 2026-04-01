@@ -1,6 +1,6 @@
 import { Eye, PencilLine, Trash2 } from "lucide-react";
 import type { Asset, License, Purchase } from "@/types/api";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, humanizeLabel } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 
 export function PurchaseList({
@@ -63,7 +63,7 @@ export function PurchaseList({
                 </div>
                 <div className="flex flex-wrap items-center gap-3 text-left md:justify-end md:text-right">
                   <p className="rounded-full border border-emerald-400/15 bg-emerald-400/[0.08] px-2.5 py-1 text-xs uppercase tracking-[0.18em] text-emerald-200">
-                    {purchase.status}
+                    {humanizeLabel(purchase.paymentStatus || purchase.status)}
                   </p>
                   <div>
                     <p className="font-display text-xl text-white">

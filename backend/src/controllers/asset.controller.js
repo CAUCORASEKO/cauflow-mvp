@@ -40,11 +40,11 @@ export const uploadAsset = async (req, res) => {
 
     const result = await pool.query(
       `
-      INSERT INTO assets (title, description, image_url)
-      VALUES ($1, $2, $3)
+      INSERT INTO assets (title, description, image_url, owner_user_id)
+      VALUES ($1, $2, $3, $4)
       RETURNING *
       `,
-      [normalizedTitle, description || null, imageUrl]
+      [normalizedTitle, description || null, imageUrl, req.user.id]
     );
 
     res.status(201).json({
@@ -63,10 +63,20 @@ export const uploadAsset = async (req, res) => {
 
 export const getAssets = async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT * FROM assets
-      ORDER BY id ASC
-    `);
+    const result =
+      req.user?.role === "creator"
+        ? await pool.query(
+            `
+            SELECT * FROM assets
+            WHERE owner_user_id = $1
+            ORDER BY id ASC
+            `,
+            [req.user.id]
+          )
+        : await pool.query(`
+            SELECT * FROM assets
+            ORDER BY id ASC
+          `);
 
     res.status(200).json({
       message: "Assets fetched successfully",
@@ -88,8 +98,9 @@ export const getAssetById = async (req, res) => {
       `
       SELECT * FROM assets
       WHERE id = $1
+        AND ($2::text IS DISTINCT FROM 'creator' OR owner_user_id = $3)
       `,
-      [assetId]
+      [assetId, req.user?.role || null, req.user?.id || null]
     );
 
     if (result.rows.length === 0) {
@@ -130,8 +141,9 @@ export const updateAsset = async (req, res) => {
       `
       SELECT * FROM assets
       WHERE id = $1
+        AND ($2 = 'admin' OR owner_user_id = $3)
       `,
-      [assetId]
+      [assetId, req.user.role, req.user.id]
     );
 
     if (existingAssetResult.rows.length === 0) {
@@ -185,9 +197,10 @@ export const deleteAsset = async (req, res) => {
       `
       DELETE FROM assets
       WHERE id = $1
+        AND ($2 = 'admin' OR owner_user_id = $3)
       RETURNING *
       `,
-      [assetId]
+      [assetId, req.user.role, req.user.id]
     );
 
     if (result.rows.length === 0) {
@@ -209,6 +222,13 @@ export const deleteAsset = async (req, res) => {
       data: normalizeResponseData(deletedAsset)
     });
   } catch (error) {
+    if (error.code === "23503") {
+      return res.status(409).json({
+        message: "Asset is used as a pack cover and cannot be deleted",
+        error: error.message
+      });
+    }
+
     res.status(500).json({
       message: "Error deleting asset",
       error: error.message

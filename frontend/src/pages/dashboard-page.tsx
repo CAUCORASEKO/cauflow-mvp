@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowUpRight,
+  Box,
   Boxes,
   CreditCard,
   FolderOpen,
   RefreshCcw,
   SearchX,
-  ShieldCheck,
-  ShoppingCart
+  ShieldCheck
 } from "lucide-react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { ActionFeedback } from "@/components/dashboard/action-feedback";
@@ -26,27 +26,67 @@ import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-stat
 import { LicenseForm } from "@/components/dashboard/license-form";
 import { LicenseDetailDrawer } from "@/components/dashboard/license-detail-drawer";
 import { LicenseList } from "@/components/dashboard/license-list";
+import { PackDetailDrawer } from "@/components/dashboard/pack-detail-drawer";
+import { PackForm } from "@/components/dashboard/pack-form";
+import { PackList } from "@/components/dashboard/pack-list";
 import { MetricCard } from "@/components/dashboard/metric-card";
-import { PurchaseForm } from "@/components/dashboard/purchase-form";
-import { PurchaseDetailDrawer } from "@/components/dashboard/purchase-detail-drawer";
-import { PurchaseList } from "@/components/dashboard/purchase-list";
 import { PanelLoadingState } from "@/components/dashboard/panel-loading-state";
+import { WorkflowRail } from "@/components/dashboard/workflow-rail";
 import { SectionHeading } from "@/components/shared/section-heading";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
   deleteAsset,
   deleteLicense,
-  deletePurchase,
+  deletePack,
   fetchAssets,
   fetchLicenses,
-  fetchPurchases
+  fetchPurchases,
+  getPacks
 } from "@/services/api";
 import { formatCurrency } from "@/lib/utils";
-import type { Asset, License, Purchase } from "@/types/api";
+import type { Asset, License, Pack, Purchase } from "@/types/api";
+
+type WorkspaceSection = "assets" | "packs" | "licenses";
+
+const workspaceSectionMeta: Record<
+  WorkspaceSection,
+  {
+    label: string;
+    eyebrow: string;
+    copy: string;
+  }
+> = {
+  assets: {
+    label: "Assets",
+    eyebrow: "Creator workspace / Assets",
+    copy: "Upload, filter, inspect, and refine the source inventory that powers the rest of the pipeline."
+  },
+  packs: {
+    label: "Packs",
+    eyebrow: "Creator workspace / Packs",
+    copy: "Assemble premium creative products from multiple assets without leaving the shared operating surface."
+  },
+  licenses: {
+    label: "Licenses",
+    eyebrow: "Creator workspace / Licenses",
+    copy: "Define rights, pricing, and commercial terms after the asset and pack layers are in place."
+  }
+};
+
+const resolveWorkspaceSection = (hash: string): WorkspaceSection => {
+  const normalizedHash = hash.replace("#", "");
+
+  if (normalizedHash === "packs" || normalizedHash === "licenses" || normalizedHash === "assets") {
+    return normalizedHash;
+  }
+
+  return "assets";
+};
 
 export function DashboardPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [packs, setPacks] = useState<Pack[]>([]);
   const [licenses, setLicenses] = useState<License[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,9 +102,12 @@ export function DashboardPage() {
   const [selectedLicenseId, setSelectedLicenseId] = useState<number | null>(null);
   const [licensePendingDelete, setLicensePendingDelete] = useState<License | null>(null);
   const [isDeletingLicense, setIsDeletingLicense] = useState(false);
-  const [selectedPurchaseId, setSelectedPurchaseId] = useState<number | null>(null);
-  const [purchasePendingDelete, setPurchasePendingDelete] = useState<Purchase | null>(null);
-  const [isDeletingPurchase, setIsDeletingPurchase] = useState(false);
+  const [selectedPackId, setSelectedPackId] = useState<number | null>(null);
+  const [packPendingDelete, setPackPendingDelete] = useState<Pack | null>(null);
+  const [isDeletingPack, setIsDeletingPack] = useState(false);
+  const [activeSection, setActiveSection] = useState<WorkspaceSection>(() =>
+    typeof window === "undefined" ? "assets" : resolveWorkspaceSection(window.location.hash)
+  );
   const [workspaceNotice, setWorkspaceNotice] = useState<{
     tone: "success" | "error";
     message: string;
@@ -75,12 +118,14 @@ export function DashboardPage() {
     try {
       setLoading(true);
       setError(null);
-      const [nextAssets, nextLicenses, nextPurchases] = await Promise.all([
+      const [nextAssets, nextPacks, nextLicenses, nextPurchases] = await Promise.all([
         fetchAssets(),
+        getPacks(),
         fetchLicenses(),
         fetchPurchases()
       ]);
       setAssets(nextAssets);
+      setPacks(nextPacks);
       setLicenses(nextLicenses);
       setPurchases(nextPurchases);
       setLastSyncedAt(new Date());
@@ -103,6 +148,74 @@ export function DashboardPage() {
     const timeout = window.setTimeout(() => setWorkspaceNotice(null), 3400);
     return () => window.clearTimeout(timeout);
   }, [workspaceNotice]);
+
+  useEffect(() => {
+    const syncFromHash = () => {
+      setActiveSection(resolveWorkspaceSection(window.location.hash));
+    };
+
+    syncFromHash();
+    window.addEventListener("hashchange", syncFromHash);
+
+    return () => window.removeEventListener("hashchange", syncFromHash);
+  }, []);
+
+  useEffect(() => {
+    if (!window.location.hash) {
+      return;
+    }
+
+    const sectionId = resolveWorkspaceSection(window.location.hash);
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(sectionId)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
+    const sectionElements = (["assets", "packs", "licenses"] as WorkspaceSection[])
+      .map((section) => document.getElementById(section))
+      .filter(Boolean) as HTMLElement[];
+
+    if (sectionElements.length === 0) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visibleEntry = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((left, right) => right.intersectionRatio - left.intersectionRatio)[0];
+
+        if (!visibleEntry) {
+          return;
+        }
+
+        const nextSection = resolveWorkspaceSection(`#${visibleEntry.target.id}`);
+        setActiveSection((currentSection) => {
+          if (currentSection === nextSection) {
+            return currentSection;
+          }
+
+          window.history.replaceState(null, "", `#${nextSection}`);
+          window.dispatchEvent(new HashChangeEvent("hashchange"));
+          return nextSection;
+        });
+      },
+      {
+        rootMargin: "-18% 0px -52% 0px",
+        threshold: [0.2, 0.35, 0.55]
+      }
+    );
+
+    sectionElements.forEach((element) => observer.observe(element));
+
+    return () => observer.disconnect();
+  }, []);
 
   const totalRevenue = useMemo(
     () =>
@@ -157,6 +270,16 @@ export function DashboardPage() {
     setAssets((currentAssets) =>
       currentAssets.map((asset) => (asset.id === updatedAsset.id ? updatedAsset : asset))
     );
+    setPacks((currentPacks) =>
+      currentPacks.map((pack) => ({
+        ...pack,
+        coverAsset:
+          pack.coverAsset?.id === updatedAsset.id ? updatedAsset : pack.coverAsset,
+        assets: pack.assets?.map((item) =>
+          item.asset.id === updatedAsset.id ? { ...item, asset: updatedAsset } : item
+        )
+      }))
+    );
     setSelectedAssetId(updatedAsset.id);
     setLastSyncedAt(new Date());
   }, []);
@@ -173,27 +296,24 @@ export function DashboardPage() {
     });
   }, []);
 
-  const handlePurchaseCreated = useCallback(
-    (purchase: Purchase) => {
-      setPurchases((currentPurchases) => [purchase, ...currentPurchases]);
-      const matchedLicense = licenses.find(
-        (license) => license.id === purchase.licenseId
-      );
+  const handlePackCreated = useCallback((pack: Pack) => {
+    setPacks((currentPacks) => [pack, ...currentPacks]);
+    setSelectedPackId(pack.id);
+    setLastSyncedAt(new Date());
+    setWorkspaceNotice({
+      tone: "success",
+      message: "Creative pack created",
+      detail: "The new product bundle is now part of the live commercial catalog."
+    });
+  }, []);
 
-      if (matchedLicense) {
-        setSelectedAssetId(matchedLicense.assetId);
-      }
-      setSelectedPurchaseId(purchase.id);
-
-      setLastSyncedAt(new Date());
-      setWorkspaceNotice({
-        tone: "success",
-        message: "Purchase recorded",
-        detail: "Revenue and relationship cues update without a manual refresh."
-      });
-    },
-    [licenses]
-  );
+  const handlePackUpdated = useCallback((updatedPack: Pack) => {
+    setPacks((currentPacks) =>
+      currentPacks.map((pack) => (pack.id === updatedPack.id ? updatedPack : pack))
+    );
+    setSelectedPackId(updatedPack.id);
+    setLastSyncedAt(new Date());
+  }, []);
 
   const handleDeleteAsset = useCallback(async () => {
     if (!assetPendingDelete) {
@@ -208,15 +328,12 @@ export function DashboardPage() {
           .filter((license) => license.assetId === deletedAsset.id)
           .map((license) => license.id)
       );
-      const deletedPurchaseIds = new Set(
-        purchases
-          .filter((purchase) => deletedLicenseIds.has(purchase.licenseId))
-          .map((purchase) => purchase.id)
-      );
+      const nextPacks = await getPacks();
 
       setAssets((currentAssets) =>
         currentAssets.filter((asset) => asset.id !== deletedAsset.id)
       );
+      setPacks(nextPacks);
       setLicenses((currentLicenses) =>
         currentLicenses.filter((license) => license.assetId !== deletedAsset.id)
       );
@@ -232,11 +349,6 @@ export function DashboardPage() {
         currentSelectedLicenseId !== null && deletedLicenseIds.has(currentSelectedLicenseId)
           ? null
           : currentSelectedLicenseId
-      );
-      setSelectedPurchaseId((currentSelectedPurchaseId) =>
-        currentSelectedPurchaseId !== null && deletedPurchaseIds.has(currentSelectedPurchaseId)
-          ? null
-          : currentSelectedPurchaseId
       );
       setAssetPendingDelete(null);
       setLastSyncedAt(new Date());
@@ -263,17 +375,12 @@ export function DashboardPage() {
         license.id === updatedLicense.id ? updatedLicense : license
       )
     );
-    setSelectedLicenseId(updatedLicense.id);
-    setLastSyncedAt(new Date());
-  }, []);
-
-  const handlePurchaseUpdated = useCallback((updatedPurchase: Purchase) => {
-    setPurchases((currentPurchases) =>
-      currentPurchases.map((purchase) =>
-        purchase.id === updatedPurchase.id ? updatedPurchase : purchase
+    setPacks((currentPacks) =>
+      currentPacks.map((pack) =>
+        pack.license?.id === updatedLicense.id ? { ...pack, license: updatedLicense } : pack
       )
     );
-    setSelectedPurchaseId(updatedPurchase.id);
+    setSelectedLicenseId(updatedLicense.id);
     setLastSyncedAt(new Date());
   }, []);
 
@@ -289,6 +396,13 @@ export function DashboardPage() {
       setLicenses((currentLicenses) =>
         currentLicenses.filter((license) => license.id !== deletedLicense.id)
       );
+      setPacks((currentPacks) =>
+        currentPacks.map((pack) =>
+          pack.licenseId === deletedLicense.id
+            ? { ...pack, licenseId: null, license: null }
+            : pack
+        )
+      );
       setPurchases((currentPurchases) =>
         currentPurchases.filter(
           (purchase) => purchase.licenseId !== deletedLicense.id
@@ -297,15 +411,6 @@ export function DashboardPage() {
       setSelectedLicenseId((currentSelectedLicenseId) =>
         currentSelectedLicenseId === deletedLicense.id ? null : currentSelectedLicenseId
       );
-      setSelectedPurchaseId((currentSelectedPurchaseId) => {
-        const deletedRelatedPurchase = purchases.find(
-          (purchase) =>
-            purchase.id === currentSelectedPurchaseId &&
-            purchase.licenseId === deletedLicense.id
-        );
-
-        return deletedRelatedPurchase ? null : currentSelectedPurchaseId;
-      });
       setLicensePendingDelete(null);
       setLastSyncedAt(new Date());
       setWorkspaceNotice({
@@ -324,48 +429,52 @@ export function DashboardPage() {
     }
   }, [licensePendingDelete, purchases]);
 
-  const handleDeletePurchase = useCallback(async () => {
-    if (!purchasePendingDelete) {
+  const handleDeletePack = useCallback(async () => {
+    if (!packPendingDelete) {
       return;
     }
 
     try {
-      setIsDeletingPurchase(true);
-      const deletedPurchase = await deletePurchase(purchasePendingDelete.id);
-      setPurchases((currentPurchases) =>
-        currentPurchases.filter((purchase) => purchase.id !== deletedPurchase.id)
+      setIsDeletingPack(true);
+      const deletedPack = await deletePack(packPendingDelete.id);
+      setPacks((currentPacks) =>
+        currentPacks.filter((pack) => pack.id !== deletedPack.id)
       );
-      setSelectedPurchaseId((currentSelectedPurchaseId) =>
-        currentSelectedPurchaseId === deletedPurchase.id ? null : currentSelectedPurchaseId
+      setSelectedPackId((currentSelectedPackId) =>
+        currentSelectedPackId === deletedPack.id ? null : currentSelectedPackId
       );
-      setPurchasePendingDelete(null);
+      setPackPendingDelete(null);
       setLastSyncedAt(new Date());
       setWorkspaceNotice({
         tone: "success",
-        message: "Purchase deleted",
-        detail: "The transaction trail updated immediately."
+        message: "Pack deleted",
+        detail: "The bundled product and its included-asset associations were removed."
       });
     } catch (deleteError) {
       setWorkspaceNotice({
         tone: "error",
         message:
-          deleteError instanceof Error ? deleteError.message : "Unable to delete purchase"
+          deleteError instanceof Error ? deleteError.message : "Unable to delete pack"
       });
     } finally {
-      setIsDeletingPurchase(false);
+      setIsDeletingPack(false);
     }
-  }, [purchasePendingDelete]);
+  }, [packPendingDelete]);
 
   const hasSearchFilters =
     searchQuery.trim().length > 0 || imageFilter !== "all" || sortOrder !== "newest";
 
+  const activeWorkflowStep =
+    purchases.length > 0 ? 3 : licenses.length > 0 ? 2 : packs.length > 0 ? 1 : 0;
+
   return (
     <DashboardShell
       assetsCount={assets.length}
+      packsCount={packs.length}
       licensesCount={licenses.length}
-      purchasesCount={purchases.length}
       totalRevenue={totalRevenue}
       hasError={Boolean(error)}
+      activeSection={activeSection}
     >
       <section
         id="overview"
@@ -374,16 +483,31 @@ export function DashboardPage() {
         <div className="grid gap-4 lg:gap-5 xl:gap-6 lg:grid-cols-[minmax(0,1.2fr),minmax(320px,0.84fr)] 2xl:grid-cols-[minmax(0,1.28fr),390px]">
           <div className="max-w-3xl self-start">
             <p className="text-xs uppercase tracking-[0.28em] text-sky-200">
-              Workspace overview
+              {workspaceSectionMeta[activeSection].eyebrow}
             </p>
             <h1 className="mt-3 font-display text-[2.45rem] font-semibold tracking-tight text-white sm:text-[2.8rem] lg:text-[2.95rem] xl:text-[3.25rem] xl:leading-[1.02]">
-              Operate the full asset-to-license pipeline from one command surface.
+              One operating surface for the asset-to-pack-to-license pipeline.
             </h1>
-            <p className="mt-3 max-w-2xl text-[15px] leading-7 text-slate-300 md:text-base xl:text-lg">
-              Review inventory, package rights, search catalog records, inspect
-              relationships, and record purchase activity against the live CauFlow
-              backend without leaving the workspace.
+            <p className="mt-3 max-w-2xl text-[15px] leading-7 text-slate-200 md:text-base xl:text-lg">
+              {workspaceSectionMeta[activeSection].copy} Sales stays in its own dedicated view, so
+              this workspace can stay focused on the core creator operation.
             </p>
+
+            <div className="mt-5 flex flex-wrap gap-2.5">
+              {(["assets", "packs", "licenses"] as WorkspaceSection[]).map((section) => (
+                <a
+                  key={section}
+                  href={`#${section}`}
+                  className={`focus-ring inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-xs uppercase tracking-[0.18em] transition ${
+                    activeSection === section
+                      ? "border-sky-300/20 bg-sky-300/[0.1] text-white"
+                      : "border-white/10 bg-white/[0.03] text-slate-300 hover:border-white/14 hover:bg-white/[0.05] hover:text-white"
+                  }`}
+                >
+                  {workspaceSectionMeta[section].label}
+                </a>
+              ))}
+            </div>
           </div>
 
           <div className="grid w-full gap-3 self-start sm:grid-cols-2">
@@ -417,8 +541,9 @@ export function DashboardPage() {
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] uppercase tracking-[0.18em] text-slate-500">
                 <span>Assets</span>
+                <span>Packs</span>
                 <span>Licenses</span>
-                <span>Purchases</span>
+                <span>Sales in dedicated view</span>
                 <span>
                   {lastSyncedAt
                     ? `Synced ${lastSyncedAt.toLocaleTimeString([], {
@@ -435,7 +560,7 @@ export function DashboardPage() {
                 Focus
               </p>
               <p className="mt-2 text-sm font-medium text-white">
-                Searchable operational inventory
+                {workspaceSectionMeta[activeSection].label}
               </p>
             </div>
             <div className="surface-highlight rounded-[24px] border border-white/10 bg-white/[0.03] p-3.5 xl:p-4 transition-all duration-300 hover:border-white/14 hover:bg-white/[0.05]">
@@ -448,6 +573,10 @@ export function DashboardPage() {
               </p>
             </div>
           </div>
+        </div>
+
+        <div className="mt-6">
+          <WorkflowRail activeStep={activeWorkflowStep} />
         </div>
       </section>
 
@@ -466,12 +595,18 @@ export function DashboardPage() {
         </Card>
       ) : null}
 
-      <section className="grid gap-4 lg:grid-cols-3">
+      <section className="grid gap-4 lg:grid-cols-4">
         <MetricCard
           label="Assets"
           value={String(assets.length)}
           detail="Curated inventory uploaded into the platform."
           icon={Boxes}
+        />
+        <MetricCard
+          label="Packs"
+          value={String(packs.length)}
+          detail="Licensable bundled products assembled from multiple assets."
+          icon={Box}
         />
         <MetricCard
           label="Licenses"
@@ -489,7 +624,7 @@ export function DashboardPage() {
 
       <section
         id="assets"
-        className="grid gap-5 xl:grid-cols-[minmax(320px,0.82fr),minmax(0,1.18fr)] 2xl:grid-cols-[380px,minmax(0,1fr)]"
+        className="scroll-mt-6 grid gap-5 xl:grid-cols-[minmax(320px,0.82fr),minmax(0,1.18fr)] 2xl:grid-cols-[380px,minmax(0,1fr)]"
       >
         <div className="xl:sticky xl:top-4 2xl:top-5 xl:self-start">
           <AssetUploadForm onCreated={handleAssetCreated} />
@@ -553,57 +688,97 @@ export function DashboardPage() {
         </Card>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-2">
-        <div id="licenses" className="space-y-6">
-          <LicenseForm assets={assets} onCreated={handleLicenseCreated} />
-          {loading ? (
-            <PanelLoadingState title="licenses" />
-          ) : licenses.length > 0 ? (
-            <LicenseList
-              licenses={licenses}
-              assets={assets}
-              purchases={purchases}
-              selectedLicenseId={selectedLicenseId}
-              onSelectLicense={(license) => setSelectedLicenseId(license.id)}
-              onDeleteLicense={(license) => setLicensePendingDelete(license)}
-            />
-          ) : (
-            <Card className="p-6">
-              <DashboardEmptyState
-                icon={ShieldCheck}
-                eyebrow="No packages yet"
-                title="License packages will appear here once rights are defined"
-                copy="Create a package from an uploaded asset to establish usage scope, pricing, and the record buyers will transact against."
-                hint="Create the first rights package from the form above"
-              />
-            </Card>
-          )}
+      <section
+        id="packs"
+        className="scroll-mt-6 grid gap-5 xl:grid-cols-[minmax(320px,0.84fr),minmax(0,1.16fr)] 2xl:grid-cols-[410px,minmax(0,1fr)]"
+      >
+        <div className="xl:sticky xl:top-4 2xl:top-5 xl:self-start">
+          <PackForm assets={assets} licenses={licenses} onCreated={handlePackCreated} />
         </div>
 
-        <div id="purchases" className="space-y-6">
-          <PurchaseForm licenses={licenses} onCreated={handlePurchaseCreated} />
-          {loading ? (
-            <PanelLoadingState title="purchases" />
-          ) : purchases.length > 0 ? (
-            <PurchaseList
-              purchases={purchases}
-              licenses={licenses}
-              assets={assets}
-              selectedPurchaseId={selectedPurchaseId}
-              onSelectPurchase={(purchase) => setSelectedPurchaseId(purchase.id)}
-              onDeletePurchase={(purchase) => setPurchasePendingDelete(purchase)}
-            />
-          ) : (
-            <Card className="p-6">
+        <Card className="surface-highlight p-6 md:p-7">
+          <SectionHeading
+            eyebrow="Packs"
+            title="Creative asset packs"
+            copy="Group assets into premium commercial bundles with a defined cover, pricing, category, and optional base license."
+          />
+
+          <div className="mt-8 space-y-6">
+            {loading ? (
+              <PanelLoadingState title="packs" />
+            ) : assets.length === 0 ? (
               <DashboardEmptyState
-                icon={ShoppingCart}
-                eyebrow="No transactions yet"
-                title="Recorded purchases will build the commercial trail here"
-                copy="After a license exists, each purchase entry adds buyer identity, linked package data, and a cleaner revenue signal across the workspace."
-                hint="Use the transaction form to log the first purchase"
+                icon={Box}
+                eyebrow="Catalog prerequisite"
+                title="Upload assets before assembling the first creative pack"
+                copy="Packs turn existing inventory into a polished commercial product, so the asset catalog needs at least one record before bundling can begin."
+                hint="Seed the asset inventory first, then return here to package it"
               />
+            ) : packs.length > 0 ? (
+              <PackList
+                packs={packs}
+                selectedPackId={selectedPackId}
+                onSelectPack={(pack) => setSelectedPackId(pack.id)}
+                onDeletePack={(pack) => setPackPendingDelete(pack)}
+              />
+            ) : (
+              <DashboardEmptyState
+                icon={Box}
+                eyebrow="No creative packs yet"
+                title="Productized bundles will appear here once the first pack is assembled"
+                copy="Use the pack builder to group assets, choose a cover, attach optional licensing context, and publish a more valuable commercial product."
+                hint="Start by selecting multiple assets and setting a cover"
+              />
+            )}
+          </div>
+        </Card>
+      </section>
+
+      <section id="licenses" className="scroll-mt-6">
+        <div className="grid gap-5 xl:grid-cols-[minmax(320px,0.82fr),minmax(0,1.18fr)] 2xl:grid-cols-[390px,minmax(0,1fr)]">
+          <div className="xl:sticky xl:top-4 xl:self-start">
+          <LicenseForm assets={assets} onCreated={handleLicenseCreated} />
+          </div>
+
+          <div className="space-y-6">
+            {loading ? (
+              <PanelLoadingState title="licenses" />
+            ) : licenses.length > 0 ? (
+              <LicenseList
+                licenses={licenses}
+                assets={assets}
+                purchases={purchases}
+                selectedLicenseId={selectedLicenseId}
+                onSelectLicense={(license) => setSelectedLicenseId(license.id)}
+                onDeleteLicense={(license) => setLicensePendingDelete(license)}
+              />
+            ) : (
+              <Card className="p-6">
+                <DashboardEmptyState
+                  icon={ShieldCheck}
+                  eyebrow="No license packages yet"
+                  title="Rights packages will appear here once commercial terms are defined"
+                  copy="Create a license from an uploaded asset to establish usage scope, pricing, and the record buyers will transact against."
+                  hint="Start by defining the first rights package from the form beside this panel"
+                />
+              </Card>
+            )}
+
+            <Card className="surface-highlight p-6">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
+                Commercial trail
+              </p>
+              <h3 className="mt-3 font-display text-2xl text-white">Sales now live in their own view</h3>
+              <p className="mt-3 text-sm leading-7 text-slate-300">
+                Purchases and revenue reporting are kept in the dedicated Sales area so this workspace
+                can stay tightly focused on creating inventory, packaging bundles, and defining rights.
+              </p>
+              <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-3 py-2 text-xs uppercase tracking-[0.18em] text-slate-300">
+                Open Sales from the creator navigation
+                <ArrowUpRight className="h-3.5 w-3.5 text-sky-200" />
+              </div>
             </Card>
-          )}
+          </div>
         </div>
       </section>
 
@@ -627,14 +802,14 @@ export function DashboardPage() {
         onLicenseUpdated={handleLicenseUpdated}
       />
 
-      <PurchaseDetailDrawer
-        purchaseId={selectedPurchaseId}
-        licenses={licenses}
+      <PackDetailDrawer
+        packId={selectedPackId}
         assets={assets}
-        isDeleting={isDeletingPurchase}
-        onClose={() => setSelectedPurchaseId(null)}
-        onDeleteRequest={(purchase) => setPurchasePendingDelete(purchase)}
-        onPurchaseUpdated={handlePurchaseUpdated}
+        licenses={licenses}
+        isDeleting={isDeletingPack}
+        onClose={() => setSelectedPackId(null)}
+        onDeleteRequest={(pack) => setPackPendingDelete(pack)}
+        onPackUpdated={handlePackUpdated}
       />
 
       <ConfirmDialog
@@ -670,22 +845,19 @@ export function DashboardPage() {
       />
 
       <ConfirmDialog
-        open={Boolean(purchasePendingDelete)}
-        title={
-          purchasePendingDelete
-            ? `Delete purchase #${purchasePendingDelete.id}?`
-            : "Delete purchase?"
-        }
-        description="This removes the transaction record from the purchase trail. The action cannot be undone."
-        confirmLabel="Delete purchase"
-        isConfirming={isDeletingPurchase}
+        open={Boolean(packPendingDelete)}
+        title={packPendingDelete ? `Delete ${packPendingDelete.title}?` : "Delete pack?"}
+        description="This removes the creative pack and its included-asset bundle structure. Existing assets and licenses stay in the catalog."
+        confirmLabel="Delete pack"
+        isConfirming={isDeletingPack}
         onClose={() => {
-          if (!isDeletingPurchase) {
-            setPurchasePendingDelete(null);
+          if (!isDeletingPack) {
+            setPackPendingDelete(null);
           }
         }}
-        onConfirm={() => void handleDeletePurchase()}
+        onConfirm={() => void handleDeletePack()}
       />
+
     </DashboardShell>
   );
 }

@@ -18,7 +18,7 @@ export function SectionHeading({
         <Badge>{eyebrow}</Badge>
         <div className="space-y-3">
           <h2 className="section-title">{title}</h2>
-          <p className="section-copy">{copy}</p>
+          <p className="section-copy max-w-3xl">{copy}</p>
         </div>
       </div>
       {action}

@@ -4,6 +4,7 @@ import type { License } from "@/types/api";
 import { createPurchase } from "@/services/api";
 import { formatCurrency } from "@/lib/utils";
 import { ActionFeedback } from "@/components/dashboard/action-feedback";
+import { FormActionFooter } from "@/components/dashboard/form-action-footer";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -65,11 +66,11 @@ export function PurchaseForm({
           <CreditCard className="h-5 w-5" />
         </div>
         <div>
-          <p className="text-xs uppercase tracking-[0.22em] text-slate-500">
+          <p className="text-xs uppercase tracking-[0.22em] text-slate-300/80">
             Transaction trail
           </p>
           <h3 className="mt-2 font-display text-2xl text-white">Record purchase</h3>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
+          <p className="mt-2 text-sm leading-6 text-slate-300">
             Capture the commercial event against an existing license without changing
             the backend purchase flow.
           </p>
@@ -78,7 +79,7 @@ export function PurchaseForm({
 
       <form className="space-y-4" onSubmit={handleSubmit}>
         <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-200">License package</label>
+          <label className="text-sm font-medium text-slate-100">License package</label>
           <Select
             value={licenseId}
             onChange={(event) => setLicenseId(event.target.value)}
@@ -94,7 +95,7 @@ export function PurchaseForm({
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-200">Buyer email</label>
+          <label className="text-sm font-medium text-slate-100">Buyer email</label>
           <Input
             type="email"
             placeholder="buyer@company.com"
@@ -120,13 +121,13 @@ export function PurchaseForm({
         ) : null}
         {error ? <ActionFeedback tone="error" message={error} /> : null}
 
-        <div className="flex items-center justify-between gap-3 border-t border-white/8 pt-4">
-          <p className="text-sm text-slate-400">
-            Purchases refresh the live revenue view once the request completes.
-          </p>
+        <FormActionFooter
+          guidance="Recording a purchase updates the revenue signal and closes the current workflow loop."
+          nextStep="Use this after the asset, pack, and license layers are already in place."
+        >
           <Button
             type="submit"
-            variant="secondary"
+            variant="primary"
             disabled={submitting || licenses.length === 0}
             className="min-w-[176px] gap-2"
             aria-busy={submitting}
@@ -134,7 +135,7 @@ export function PurchaseForm({
             {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
             {submitting ? "Creating purchase..." : "Create purchase"}
           </Button>
-        </div>
+        </FormActionFooter>
       </form>
     </Card>
   );

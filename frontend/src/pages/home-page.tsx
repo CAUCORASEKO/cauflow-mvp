@@ -9,6 +9,8 @@ import {
   Wallet
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/contexts/auth-context";
+import { getAuthenticatedHomePath } from "@/lib/platform-nav";
 import { SiteHeader } from "@/components/layout/site-header";
 import { SectionHeading } from "@/components/shared/section-heading";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +57,9 @@ const valueProps = [
 ];
 
 export function HomePage() {
+  const { user } = useAuth();
+  const appPath = user ? getAuthenticatedHomePath(user) : "/signup";
+
   return (
     <div className="relative overflow-hidden">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[620px] bg-mesh opacity-90" />
@@ -77,14 +82,21 @@ export function HomePage() {
               </div>
 
               <div className="flex flex-col gap-4 sm:flex-row">
-                <Link to="/app">
+                <Link to={appPath}>
                   <Button className="w-full gap-2 sm:w-auto">
-                    Launch dashboard
+                    {user ? "Open app" : "Sign up"}
                     <ArrowRight className="h-4 w-4" />
                   </Button>
                 </Link>
+                {!user ? (
+                  <Link to="/login">
+                    <Button variant="secondary" className="w-full sm:w-auto">
+                      Log in
+                    </Button>
+                  </Link>
+                ) : null}
                 <a href="#how-it-works">
-                  <Button variant="secondary" className="w-full sm:w-auto">
+                  <Button variant={user ? "secondary" : "ghost"} className="w-full sm:w-auto">
                     Explore product flow
                   </Button>
                 </a>
@@ -290,9 +302,9 @@ export function HomePage() {
                   in a way that feels fundable.
                 </p>
                 <div className="mt-8">
-                  <Link to="/app">
+                  <Link to={appPath}>
                     <Button className="gap-2">
-                      Enter the workspace
+                      {user ? "Enter the workspace" : "Create account"}
                       <ArrowRight className="h-4 w-4" />
                     </Button>
                   </Link>

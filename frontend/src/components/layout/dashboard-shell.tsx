@@ -1,10 +1,9 @@
 import { useEffect, useState, type PropsWithChildren } from "react";
 import {
   Activity,
+  Box,
   Boxes,
-  CreditCard,
   Gauge,
-  LayoutDashboard,
   LifeBuoy,
   ShieldCheck,
   Sparkles
@@ -12,48 +11,55 @@ import {
 import { Link } from "react-router-dom";
 import { formatCurrency } from "@/lib/utils";
 
+type WorkspaceSection = "assets" | "packs" | "licenses";
+
 interface DashboardShellProps extends PropsWithChildren {
   assetsCount: number;
+  packsCount: number;
   licensesCount: number;
-  purchasesCount: number;
   totalRevenue: number;
   hasError: boolean;
+  activeSection: WorkspaceSection;
 }
 
 const navItems = [
-  { label: "Overview", icon: LayoutDashboard, href: "#overview" },
   { label: "Assets", icon: Boxes, href: "#assets" },
-  { label: "Licenses", icon: ShieldCheck, href: "#licenses" },
-  { label: "Purchases", icon: CreditCard, href: "#purchases" }
+  { label: "Packs", icon: Box, href: "#packs" },
+  { label: "Licenses", icon: ShieldCheck, href: "#licenses" }
 ];
 
 const pulseMetrics = [
   { label: "Assets", valueKey: "assets" },
+  { label: "Packs", valueKey: "packs" },
   { label: "Licenses", valueKey: "licenses" },
-  { label: "Sales", valueKey: "purchases" },
   { label: "Revenue", valueKey: "revenue" }
 ] as const;
 
 export function DashboardShell({
   children,
   assetsCount,
+  packsCount,
   licensesCount,
-  purchasesCount,
   totalRevenue,
-  hasError
+  hasError,
+  activeSection
 }: DashboardShellProps) {
-  const [activeHash, setActiveHash] = useState(() => window.location.hash || "#overview");
+  const [activeHash, setActiveHash] = useState(
+    () => window.location.hash || `#${activeSection}`
+  );
+
+  const activeSectionLabel = navItems.find((item) => item.href === `#${activeSection}`)?.label || "Assets";
 
   useEffect(() => {
     const syncHash = () => {
-      setActiveHash(window.location.hash || "#overview");
+      setActiveHash(window.location.hash || `#${activeSection}`);
     };
 
     syncHash();
     window.addEventListener("hashchange", syncHash);
 
     return () => window.removeEventListener("hashchange", syncHash);
-  }, []);
+  }, [activeSection]);
 
   return (
     <div className="min-h-screen bg-mesh">
@@ -99,11 +105,11 @@ export function DashboardShell({
                   const value =
                     valueKey === "assets"
                       ? assetsCount
-                      : valueKey === "licenses"
+                      : valueKey === "packs"
+                        ? packsCount
+                        : valueKey === "licenses"
                         ? licensesCount
-                        : valueKey === "purchases"
-                          ? purchasesCount
-                          : formatCurrency(totalRevenue);
+                        : formatCurrency(totalRevenue);
 
                   return (
                     <div
@@ -120,6 +126,16 @@ export function DashboardShell({
                   );
                 })}
               </div>
+            </div>
+
+            <div className="mt-4 rounded-[24px] border border-sky-300/14 bg-sky-300/[0.06] p-3.5 xl:p-4">
+              <p className="text-[11px] uppercase tracking-[0.24em] text-slate-400">
+                Focused on
+              </p>
+              <p className="mt-2 font-display text-2xl text-white">{activeSectionLabel}</p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">
+                You are still in the shared creator workspace, with the current focus pinned to this section.
+              </p>
             </div>
 
             <div className="mt-4">
@@ -179,7 +195,7 @@ export function DashboardShell({
                   <span className="text-sm font-semibold">Operator notes</span>
                 </div>
                 <p className="text-sm leading-6 text-slate-400">
-                  Upload first, package rights second, then track the commercial trail.
+                  Upload assets, assemble product packs, attach rights, then track the commercial trail.
                 </p>
               </div>
             </div>

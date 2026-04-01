@@ -5,9 +5,9 @@ export const createPurchase = async (req, res) => {
   try {
     const { licenseId, buyerEmail } = req.body;
 
-    if (!licenseId || !buyerEmail) {
+    if (!licenseId) {
       return res.status(400).json({
-        message: "licenseId and buyerEmail are required"
+        message: "licenseId is required"
       });
     }
 
@@ -27,13 +27,29 @@ export const createPurchase = async (req, res) => {
       });
     }
 
+    const license = licenseResult.rows[0];
+
     const result = await pool.query(
       `
-      INSERT INTO purchases (license_id, buyer_email, status)
-      VALUES ($1, $2, $3)
+      INSERT INTO purchases (
+        license_id,
+        buyer_email,
+        status,
+        buyer_user_id,
+        creator_user_id,
+        payment_status
+      )
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
       `,
-      [numericLicenseId, buyerEmail, "completed"]
+      [
+        numericLicenseId,
+        buyerEmail || req.user.email,
+        "completed",
+        req.user.id,
+        license.owner_user_id || null,
+        "paid"
+      ]
     );
 
     res.status(201).json({
@@ -50,10 +66,29 @@ export const createPurchase = async (req, res) => {
 
 export const getPurchases = async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT * FROM purchases
-      ORDER BY id ASC
-    `);
+    const result =
+      req.user.role === "admin"
+        ? await pool.query(`
+            SELECT * FROM purchases
+            ORDER BY id ASC
+          `)
+        : req.user.role === "creator"
+          ? await pool.query(
+              `
+              SELECT * FROM purchases
+              WHERE creator_user_id = $1
+              ORDER BY id ASC
+              `,
+              [req.user.id]
+            )
+          : await pool.query(
+              `
+              SELECT * FROM purchases
+              WHERE buyer_user_id = $1
+              ORDER BY id ASC
+              `,
+              [req.user.id]
+            );
 
     res.status(200).json({
       message: "Purchases fetched successfully",
@@ -75,8 +110,13 @@ export const getPurchaseById = async (req, res) => {
       `
       SELECT * FROM purchases
       WHERE id = $1
+        AND (
+          $2 = 'admin'
+          OR buyer_user_id = $3
+          OR creator_user_id = $3
+        )
       `,
-      [purchaseId]
+      [purchaseId, req.user.role, req.user.id]
     );
 
     if (result.rows.length === 0) {
@@ -113,9 +153,10 @@ export const updatePurchase = async (req, res) => {
       UPDATE purchases
       SET buyer_email = $1, status = COALESCE($2, status)
       WHERE id = $3
+        AND ($4 = 'admin' OR buyer_user_id = $5)
       RETURNING *
       `,
-      [buyerEmail, status || null, purchaseId]
+      [buyerEmail, status || null, purchaseId, req.user.role, req.user.id]
     );
 
     if (result.rows.length === 0) {
@@ -144,9 +185,10 @@ export const deletePurchase = async (req, res) => {
       `
       DELETE FROM purchases
       WHERE id = $1
+        AND ($2 = 'admin' OR buyer_user_id = $3)
       RETURNING *
       `,
-      [purchaseId]
+      [purchaseId, req.user.role, req.user.id]
     );
 
     if (result.rows.length === 0) {

@@ -162,8 +162,9 @@ export const createLicense = async (req, res) => {
       `
       SELECT * FROM assets
       WHERE id = $1
+        AND ($2 = 'admin' OR owner_user_id = $3)
       `,
-      [numericAssetId]
+      [numericAssetId, req.user.role, req.user.id]
     );
 
     if (assetResult.rows.length === 0) {
@@ -176,11 +177,11 @@ export const createLicense = async (req, res) => {
 
     const result = await client.query(
       `
-      INSERT INTO licenses (asset_id, type, price, usage)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO licenses (asset_id, type, price, usage, owner_user_id)
+      VALUES ($1, $2, $3, $4, $5)
       RETURNING *
       `,
-      [numericAssetId, type, price, usage]
+      [numericAssetId, type, price, usage, req.user.id]
     );
 
     const createdLicense = result.rows[0];
@@ -217,10 +218,20 @@ export const createLicense = async (req, res) => {
 
 export const getLicenses = async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT * FROM licenses
-      ORDER BY id ASC
-    `);
+    const result =
+      req.user?.role === "creator"
+        ? await pool.query(
+            `
+            SELECT * FROM licenses
+            WHERE owner_user_id = $1
+            ORDER BY id ASC
+            `,
+            [req.user.id]
+          )
+        : await pool.query(`
+            SELECT * FROM licenses
+            ORDER BY id ASC
+          `);
 
     const licensesWithPolicies = await attachPoliciesToLicenses(pool, result.rows);
 
@@ -241,7 +252,10 @@ export const getLicenseById = async (req, res) => {
     const licenseId = Number(req.params.id);
     const licenseWithPolicy = await fetchLicenseWithPolicyById(pool, licenseId);
 
-    if (!licenseWithPolicy) {
+    if (
+      !licenseWithPolicy ||
+      (req.user?.role === "creator" && licenseWithPolicy.owner_user_id !== req.user.id)
+    ) {
       return res.status(404).json({
         message: "License not found"
       });
@@ -279,9 +293,10 @@ export const updateLicense = async (req, res) => {
       UPDATE licenses
       SET type = $1, price = $2, usage = $3
       WHERE id = $4
+        AND ($5 = 'admin' OR owner_user_id = $6)
       RETURNING *
       `,
-      [type, price, usage, licenseId]
+      [type, price, usage, licenseId, req.user.role, req.user.id]
     );
 
     if (result.rows.length === 0) {
@@ -334,9 +349,10 @@ export const deleteLicense = async (req, res) => {
       `
       DELETE FROM licenses
       WHERE id = $1
+        AND ($2 = 'admin' OR owner_user_id = $3)
       RETURNING *
       `,
-      [licenseId]
+      [licenseId, req.user.role, req.user.id]
     );
 
     if (result.rows.length === 0) {

@@ -7,6 +7,8 @@ import {
 } from "@/lib/license-policy";
 import { createLicense } from "@/services/api";
 import { ActionFeedback } from "@/components/dashboard/action-feedback";
+import { FormActionFooter } from "@/components/dashboard/form-action-footer";
+import { FormSection } from "@/components/dashboard/form-section";
 import { LicensePolicyBuilder } from "@/components/dashboard/license-policy-builder";
 import { PolicySummaryCard } from "@/components/dashboard/policy-summary-card";
 import { Button } from "@/components/ui/button";
@@ -81,24 +83,26 @@ export function LicenseForm({
           <ShieldCheck className="h-5 w-5" />
         </div>
         <div>
-          <p className="text-xs uppercase tracking-[0.22em] text-slate-500">
+          <p className="text-xs uppercase tracking-[0.22em] text-slate-300/80">
             Rights packaging
           </p>
           <h3 className="mt-2 font-display text-2xl text-white">Define license</h3>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
+          <p className="mt-2 text-sm leading-6 text-slate-300">
             Turn uploaded IP into a monetization unit with explicit usage and price.
           </p>
         </div>
       </div>
 
       <form className="space-y-5" onSubmit={handleSubmit}>
-        <section className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
-          <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
-            License basics
-          </p>
+        <FormSection
+          step="01"
+          eyebrow="Source asset"
+          title="Anchor the license to an inventory record"
+          description="Choose the asset, then define the commercial package buyers will purchase."
+        >
           <div className="mt-4 space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-200">Source asset</label>
+              <label className="text-sm font-medium text-slate-100">Source asset</label>
               <Select
                 value={assetId}
                 onChange={(event) => setAssetId(event.target.value)}
@@ -115,7 +119,7 @@ export function LicenseForm({
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-200">
+                <label className="text-sm font-medium text-slate-100">
                   License type
                 </label>
                 <Input
@@ -126,7 +130,7 @@ export function LicenseForm({
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-200">Usage</label>
+                <label className="text-sm font-medium text-slate-100">Scope / usage</label>
                 <Input
                   placeholder="Web"
                   value={usage}
@@ -137,7 +141,7 @@ export function LicenseForm({
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-200">Price</label>
+              <label className="text-sm font-medium text-slate-100">Price</label>
               <Input
                 type="number"
                 step="0.01"
@@ -149,16 +153,30 @@ export function LicenseForm({
               />
             </div>
           </div>
-        </section>
+        </FormSection>
 
-        <LicensePolicyBuilder
-          enabled={policyEnabled}
-          onEnabledChange={setPolicyEnabled}
-          value={policy}
-          onChange={setPolicy}
-        />
+        <FormSection
+          step="02"
+          eyebrow="Policy"
+          title="Define the AI-native commercial rules"
+          description="Shape attribution, training, derivatives, redistribution, and exclusivity from one policy builder."
+        >
+          <LicensePolicyBuilder
+            enabled={policyEnabled}
+            onEnabledChange={setPolicyEnabled}
+            value={policy}
+            onChange={setPolicy}
+          />
+        </FormSection>
 
-        <PolicySummaryCard policy={policyEnabled ? policy : null} empty={!policyEnabled} />
+        <FormSection
+          step="03"
+          eyebrow="Summary"
+          title="Review the operating terms"
+          description="This summary becomes the quick legal read before a purchase is recorded."
+        >
+          <PolicySummaryCard policy={policyEnabled ? policy : null} empty={!policyEnabled} />
+        </FormSection>
 
         {submitting ? (
           <ActionFeedback
@@ -176,13 +194,13 @@ export function LicenseForm({
         ) : null}
         {error ? <ActionFeedback tone="error" message={error} /> : null}
 
-        <div className="flex items-center justify-between gap-3 border-t border-white/8 pt-4">
-          <p className="text-sm text-slate-400">
-            Packages become available for purchase immediately after creation.
-          </p>
+        <FormActionFooter
+          guidance="The license becomes purchasable immediately after creation."
+          nextStep="Once this package exists, record a purchase to extend the commercial trail."
+        >
           <Button
             type="submit"
-            variant="secondary"
+            variant="primary"
             disabled={submitting || assets.length === 0}
             className="min-w-[168px] gap-2"
             aria-busy={submitting}
@@ -190,7 +208,7 @@ export function LicenseForm({
             {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
             {submitting ? "Creating license..." : "Create license"}
           </Button>
-        </div>
+        </FormActionFooter>
       </form>
     </Card>
   );

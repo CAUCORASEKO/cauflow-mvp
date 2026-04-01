@@ -6,13 +6,14 @@ import {
   updatePurchase,
   deletePurchase
 } from "../controllers/purchase.controller.js";
+import { requireAuth, requireRole, requireVerifiedAccount } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
-router.post("/", createPurchase);
-router.get("/", getPurchases);
-router.get("/:id", getPurchaseById);
-router.patch("/:id", updatePurchase);
-router.delete("/:id", deletePurchase);
+router.post("/", requireAuth, requireVerifiedAccount, requireRole("buyer", "admin"), createPurchase);
+router.get("/", requireAuth, requireVerifiedAccount, getPurchases);
+router.get("/:id", requireAuth, requireVerifiedAccount, getPurchaseById);
+router.patch("/:id", requireAuth, requireVerifiedAccount, updatePurchase);
+router.delete("/:id", requireAuth, requireVerifiedAccount, deletePurchase);
 
 export default router;

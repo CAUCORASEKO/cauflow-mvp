@@ -58,9 +58,9 @@ export function ActionFeedback({
           <Icon className={cn("h-4 w-4", iconClassName)} />
         </div>
         <div className="min-w-0">
-          <p className="text-[11px] uppercase tracking-[0.22em] text-white/55">{label}</p>
+          <p className="text-[11px] uppercase tracking-[0.22em] text-white/70">{label}</p>
           <p className="mt-1 text-sm font-medium text-white">{message}</p>
-          {detail ? <p className="mt-1 text-sm text-white/70">{detail}</p> : null}
+          {detail ? <p className="mt-1 text-sm leading-6 text-white/80">{detail}</p> : null}
         </div>
       </div>
     </div>
