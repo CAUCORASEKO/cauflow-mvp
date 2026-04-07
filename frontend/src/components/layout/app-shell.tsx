@@ -2,6 +2,7 @@ import { useEffect, useState, type PropsWithChildren } from "react";
 import { LogOut } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/auth-context";
+import { UserAvatar } from "@/components/shared/user-avatar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -65,11 +66,21 @@ export function AppShell({
           </div>
 
           <div className="flex flex-col gap-3 md:items-end">
-            <div className="text-sm text-slate-300">
-              {user?.publicDisplayName || user?.email}
-              <span className="ml-2 rounded-full border border-white/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-slate-300/80">
-                {user?.role}
-              </span>
+            <div className="flex items-center gap-3">
+              <UserAvatar
+                avatarUrl={user?.avatarUrl || null}
+                displayName={user?.publicDisplayName || user?.email || "CauFlow user"}
+                className="h-11 w-11"
+                fallbackClassName="text-sm"
+              />
+              <div className="min-w-0 text-sm text-slate-300">
+                <div className="truncate">
+                  {user?.publicDisplayName || user?.email}
+                </div>
+                <span className="mt-1 inline-flex rounded-full border border-white/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-slate-300/80">
+                  {user?.role}
+                </span>
+              </div>
             </div>
             <Button variant="ghost" className="gap-2" onClick={() => void logOut()}>
               <LogOut className="h-4 w-4" />

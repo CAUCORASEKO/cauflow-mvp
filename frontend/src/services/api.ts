@@ -79,7 +79,12 @@ export const getAssetImageUrl = (imageUrl: string | null) => {
     return null;
   }
 
-  if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
+  if (
+    imageUrl.startsWith("http://") ||
+    imageUrl.startsWith("https://") ||
+    imageUrl.startsWith("blob:") ||
+    imageUrl.startsWith("data:")
+  ) {
     return imageUrl;
   }
 
@@ -456,14 +461,38 @@ export const fetchAccount = async () => {
   return handleResponse<Account>(response);
 };
 
-export const updateProfile = async (input: Partial<Account>) => {
-  const response = await fetch(`${API_BASE_URL}/account/profile`, {
-    method: "PATCH",
-    headers: getAuthHeaders({
-      "Content-Type": "application/json"
-    }),
-    body: JSON.stringify(input)
-  });
+export const updateProfile = async (
+  input: Partial<Account> & {
+    avatarFile?: File | null;
+  }
+) => {
+  let response: Response;
+
+  if (input.avatarFile) {
+    const formData = new FormData();
+
+    if (typeof input.publicDisplayName === "string") {
+      formData.append("publicDisplayName", input.publicDisplayName);
+    }
+
+    formData.append("avatar", input.avatarFile);
+
+    response = await fetch(`${API_BASE_URL}/account/profile`, {
+      method: "PATCH",
+      headers: getAuthHeaders(),
+      body: formData
+    });
+  } else {
+    const { avatarFile, ...restInput } = input;
+
+    response = await fetch(`${API_BASE_URL}/account/profile`, {
+      method: "PATCH",
+      headers: getAuthHeaders({
+        "Content-Type": "application/json"
+      }),
+      body: JSON.stringify(restInput)
+    });
+  }
 
   return handleResponse<Account>(response);
 };

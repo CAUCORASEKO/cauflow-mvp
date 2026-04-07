@@ -1,5 +1,27 @@
 import { pool } from "../config/db.js";
+import fs from "fs/promises";
+import path from "path";
+import { fileURLToPath } from "url";
 import { fetchAccountByUserId } from "../utils/account.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const removeUploadedAvatar = async (imageUrl) => {
+  if (!imageUrl?.startsWith("/uploads/avatars/")) {
+    return;
+  }
+
+  const absoluteFilePath = path.join(__dirname, "..", "..", imageUrl.replace("/uploads/", "uploads/"));
+
+  try {
+    await fs.unlink(absoluteFilePath);
+  } catch (error) {
+    if (error.code !== "ENOENT") {
+      console.error(`Failed to remove uploaded avatar: ${absoluteFilePath}`, error.message);
+    }
+  }
+};
 
 const updateProfileSection = async (db, userId, fields) => {
   await db.query(
@@ -18,7 +40,17 @@ const updateProfileSection = async (db, userId, fields) => {
       updated_at
     )
     VALUES (
-      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP
+      $1,
+      COALESCE($2, (SELECT public_display_name FROM profiles WHERE user_id = $1)),
+      COALESCE($3, (SELECT avatar_url FROM profiles WHERE user_id = $1)),
+      COALESCE($4, (SELECT organization_name FROM profiles WHERE user_id = $1)),
+      COALESCE($5, (SELECT studio_name FROM profiles WHERE user_id = $1)),
+      COALESCE($6, (SELECT country FROM profiles WHERE user_id = $1)),
+      COALESCE($7, (SELECT preferred_currency FROM profiles WHERE user_id = $1), 'USD'),
+      COALESCE($8, (SELECT wallet_address FROM profiles WHERE user_id = $1)),
+      COALESCE($9, (SELECT wallet_connection_status FROM profiles WHERE user_id = $1), 'disconnected'),
+      COALESCE($10, (SELECT onboarding_completed FROM profiles WHERE user_id = $1), false),
+      CURRENT_TIMESTAMP
     )
     ON CONFLICT (user_id)
     DO UPDATE SET
@@ -61,7 +93,16 @@ const updateCreatorSettingsSection = async (db, userId, fields) => {
       stripe_connect_account_id,
       updated_at
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
+    VALUES (
+      $1,
+      COALESCE($2, (SELECT payout_onboarding_status FROM creator_settings WHERE user_id = $1), 'not_started'),
+      COALESCE($3, (SELECT default_license_type FROM creator_settings WHERE user_id = $1)),
+      COALESCE($4, (SELECT default_license_usage FROM creator_settings WHERE user_id = $1)),
+      COALESCE($5, (SELECT default_price FROM creator_settings WHERE user_id = $1)),
+      COALESCE($6, (SELECT tax_reference FROM creator_settings WHERE user_id = $1)),
+      COALESCE($7, (SELECT stripe_connect_account_id FROM creator_settings WHERE user_id = $1)),
+      CURRENT_TIMESTAMP
+    )
     ON CONFLICT (user_id)
     DO UPDATE SET
       payout_onboarding_status = COALESCE(EXCLUDED.payout_onboarding_status, creator_settings.payout_onboarding_status),
@@ -95,8 +136,21 @@ export const getAccount = async (req, res) => {
 
 export const updateProfile = async (req, res) => {
   try {
-    await updateProfileSection(pool, req.user.id, req.body);
+    const nextAvatarUrl = req.file ? `/uploads/avatars/${req.file.filename}` : req.body.avatarUrl;
+
+    await updateProfileSection(pool, req.user.id, {
+      ...req.body,
+      avatarUrl: nextAvatarUrl
+    });
     const account = await fetchAccountByUserId(pool, req.user.id);
+
+    if (
+      req.file &&
+      req.user.avatarUrl &&
+      req.user.avatarUrl !== nextAvatarUrl
+    ) {
+      await removeUploadedAvatar(req.user.avatarUrl);
+    }
 
     res.status(200).json({
       message: "Profile updated successfully",

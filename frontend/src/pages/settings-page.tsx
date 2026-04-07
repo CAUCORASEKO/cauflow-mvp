@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent, type PropsWithChildren } 
 import { ArrowUpRight, Building2, CreditCard, ShieldCheck, UserCircle2, Wallet } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { ActionFeedback } from "@/components/dashboard/action-feedback";
+import { AvatarUploadField } from "@/components/settings/avatar-upload-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -102,9 +103,13 @@ function StatusBadge({
 }
 
 export function SettingsPage() {
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, refreshSession } = useAuth();
   const [message, setMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [savingSection, setSavingSection] = useState<string | null>(null);
+  const [profileDisplayName, setProfileDisplayName] = useState(user?.publicDisplayName || "");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!message) {
@@ -114,6 +119,23 @@ export function SettingsPage() {
     const timeout = window.setTimeout(() => setMessage(null), 3200);
     return () => window.clearTimeout(timeout);
   }, [message]);
+
+  useEffect(() => {
+    if (!errorMessage) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => setErrorMessage(null), 4000);
+    return () => window.clearTimeout(timeout);
+  }, [errorMessage]);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    setProfileDisplayName(user.publicDisplayName || "");
+  }, [user]);
 
   if (!user) {
     return null;
@@ -146,17 +168,44 @@ export function SettingsPage() {
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       setSavingSection(sectionKey);
+      setErrorMessage(null);
       const formData = new FormData(event.currentTarget);
       const payload = Object.fromEntries(formData.entries());
 
       try {
         const account = await updater(payload);
         updateUser(account);
+        await refreshSession();
         setMessage(successMessage);
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : "Unable to save changes.");
       } finally {
         setSavingSection(null);
       }
     };
+
+  const handleProfileSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSavingSection("profile");
+    setAvatarError(null);
+    setErrorMessage(null);
+
+    try {
+      const account = await updateProfile({
+        publicDisplayName: profileDisplayName,
+        avatarFile
+      });
+      updateUser(account);
+      await refreshSession();
+      setProfileDisplayName(account.publicDisplayName || "");
+      setAvatarFile(null);
+      setMessage("Profile updated.");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to update profile.");
+    } finally {
+      setSavingSection(null);
+    }
+  };
 
   const handleWalletDisconnect = async () => {
     setSavingSection("wallet");
@@ -167,7 +216,10 @@ export function SettingsPage() {
         walletConnectionStatus: "disconnected"
       });
       updateUser(account);
+      await refreshSession();
       setMessage("Wallet placeholder disconnected.");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to update wallet settings.");
     } finally {
       setSavingSection(null);
     }
@@ -177,16 +229,32 @@ export function SettingsPage() {
     return (
       <AppShell title="Settings" subtitle="Account and business" navItems={navItems}>
         {message ? <ActionFeedback tone="success" message={message} /> : null}
+        {errorMessage ? <ActionFeedback tone="error" message={errorMessage} /> : null}
         <div className="grid gap-5">
           <SettingsSection
             eyebrow="Profile"
             title="Account identity"
             copy="Update the visible account fields used across the current CauFlow experience."
           >
-            <form className="space-y-4" onSubmit={handleSectionSubmit("profile", "Settings saved.", updateProfile)}>
-              <Input name="publicDisplayName" defaultValue={user.publicDisplayName || ""} placeholder="Public display name" />
-              <Input name="avatarUrl" defaultValue={user.avatarUrl || ""} placeholder="Avatar URL" />
-              <Button type="submit" disabled={savingSection === "profile"}>
+            <form className="space-y-5" onSubmit={handleProfileSubmit}>
+              <Input
+                name="publicDisplayName"
+                value={profileDisplayName}
+                onChange={(event) => setProfileDisplayName(event.target.value)}
+                placeholder="Public display name"
+              />
+              <AvatarUploadField
+                currentAvatarUrl={user.avatarUrl}
+                displayName={profileDisplayName || user.email}
+                selectedFile={avatarFile}
+                onFileSelect={(file, error) => {
+                  setAvatarFile(file);
+                  setAvatarError(error || null);
+                }}
+                error={avatarError}
+                disabled={savingSection === "profile"}
+              />
+              <Button type="submit" disabled={savingSection === "profile" || Boolean(avatarError)}>
                 {savingSection === "profile" ? "Saving..." : "Save profile"}
               </Button>
             </form>
@@ -199,6 +267,7 @@ export function SettingsPage() {
   return (
     <AppShell title="Settings" subtitle="Creator account and business controls" navItems={navItems}>
       {message ? <ActionFeedback tone="success" message={message} /> : null}
+      {errorMessage ? <ActionFeedback tone="error" message={errorMessage} /> : null}
 
       <div className="grid gap-5">
         <SettingsSection
@@ -206,25 +275,30 @@ export function SettingsPage() {
           title="Creator identity"
           copy="Profile fields define how your creator identity appears across the platform. Keep this section focused on public-facing identity only."
         >
-          <form className="space-y-5" onSubmit={handleSectionSubmit("profile", "Profile updated.", updateProfile)}>
+          <form className="space-y-5" onSubmit={handleProfileSubmit}>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-100">Public display name</label>
                 <Input
                   name="publicDisplayName"
-                  defaultValue={user.publicDisplayName || ""}
+                  value={profileDisplayName}
+                  onChange={(event) => setProfileDisplayName(event.target.value)}
                   placeholder="How buyers and collaborators will see you"
                 />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-100">Avatar URL</label>
-                <Input
-                  name="avatarUrl"
-                  defaultValue={user.avatarUrl || ""}
-                  placeholder="Optional visual identity image"
-                />
-              </div>
             </div>
+
+            <AvatarUploadField
+              currentAvatarUrl={user.avatarUrl}
+              displayName={profileDisplayName || user.email}
+              selectedFile={avatarFile}
+              onFileSelect={(file, error) => {
+                setAvatarFile(file);
+                setAvatarError(error || null);
+              }}
+              error={avatarError}
+              disabled={savingSection === "profile"}
+            />
 
             <div className="flex items-center justify-between gap-3 rounded-[22px] border border-white/10 bg-black/20 p-4">
               <div className="flex items-start gap-3">
@@ -238,7 +312,7 @@ export function SettingsPage() {
                   </p>
                 </div>
               </div>
-              <Button type="submit" disabled={savingSection === "profile"}>
+              <Button type="submit" disabled={savingSection === "profile" || Boolean(avatarError)}>
                 {savingSection === "profile" ? "Saving..." : "Save profile"}
               </Button>
             </div>

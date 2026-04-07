@@ -9,6 +9,8 @@ import {
   Sparkles
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/contexts/auth-context";
+import { UserAvatar } from "@/components/shared/user-avatar";
 import { formatCurrency } from "@/lib/utils";
 
 type WorkspaceSection = "assets" | "packs" | "licenses";
@@ -44,6 +46,7 @@ export function DashboardShell({
   hasError,
   activeSection
 }: DashboardShellProps) {
+  const { user } = useAuth();
   const [activeHash, setActiveHash] = useState(
     () => window.location.hash || `#${activeSection}`
   );
@@ -84,6 +87,25 @@ export function DashboardShell({
                 </p>
               </div>
             </Link>
+
+            {user ? (
+              <div className="mt-4 flex items-center gap-3 rounded-[24px] border border-white/10 bg-white/[0.03] p-3.5">
+                <UserAvatar
+                  avatarUrl={user.avatarUrl}
+                  displayName={user.publicDisplayName || user.email}
+                  className="h-11 w-11 shrink-0"
+                  fallbackClassName="text-sm"
+                />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-white">
+                    {user.publicDisplayName || user.email}
+                  </p>
+                  <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-slate-400">
+                    {user.role}
+                  </p>
+                </div>
+              </div>
+            ) : null}
 
             <div className="mt-5 rounded-[24px] border border-white/10 bg-black/20 p-3.5 xl:p-4">
               <div className="flex items-center justify-between">
