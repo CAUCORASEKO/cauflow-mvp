@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useState, type FormEvent, type PropsWithChildren } from "react";
-import { ArrowUpRight, Building2, CreditCard, ShieldCheck, UserCircle2, Wallet } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import {
+  AlertTriangle,
+  ArrowUpRight,
+  Building2,
+  CreditCard,
+  ShieldCheck,
+  UserCircle2,
+  Wallet
+} from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { ActionFeedback } from "@/components/dashboard/action-feedback";
 import { AvatarUploadField } from "@/components/settings/avatar-upload-field";
@@ -12,6 +21,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { adminNav, buyerNav, creatorNav } from "@/lib/platform-nav";
 import { cn, humanizeLabel } from "@/lib/utils";
 import {
+  closeAccount,
   updateBusinessSettings,
   updateLicensingDefaults,
   updateProfile,
@@ -103,13 +113,17 @@ function StatusBadge({
 }
 
 export function SettingsPage() {
-  const { user, updateUser, refreshSession } = useAuth();
+  const { user, updateUser, refreshSession, logOut } = useAuth();
+  const navigate = useNavigate();
   const [message, setMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [savingSection, setSavingSection] = useState<string | null>(null);
   const [profileDisplayName, setProfileDisplayName] = useState(user?.publicDisplayName || "");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [closingAccount, setClosingAccount] = useState(false);
 
   useEffect(() => {
     if (!message) {
@@ -225,6 +239,135 @@ export function SettingsPage() {
     }
   };
 
+  const handleCloseAccount = async () => {
+    setClosingAccount(true);
+    setErrorMessage(null);
+
+    try {
+      await closeAccount(deleteConfirmation);
+      setDeleteModalOpen(false);
+      setDeleteConfirmation("");
+      await logOut();
+      navigate("/login", {
+        replace: true,
+        state: {
+          message:
+            "Your account has been closed. Access to the workspace has been removed."
+        }
+      });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to close account.");
+    } finally {
+      setClosingAccount(false);
+    }
+  };
+
+  const dangerZone = (
+    <>
+      <SettingsSection
+        eyebrow="Danger zone"
+        title="Close account"
+        copy="This action removes access to your CauFlow workspace, ends active sessions, and blocks future sign-in for this account. Commercial records may remain for transaction history and audit integrity."
+      >
+        <div className="rounded-[24px] border border-rose-400/16 bg-rose-400/[0.05] p-5">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-rose-400/18 bg-rose-400/[0.08] text-rose-100">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-white">Close this account</p>
+                <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-300">
+                  You will be signed out immediately. Assets, licenses, purchases, and sales records may remain in place so the platform keeps a coherent commercial history.
+                </p>
+              </div>
+            </div>
+
+            <Button
+              type="button"
+              variant="secondary"
+              className="border-rose-400/20 bg-rose-400/[0.08] text-rose-100 hover:bg-rose-400/[0.14]"
+              onClick={() => setDeleteModalOpen(true)}
+            >
+              Close account
+            </Button>
+          </div>
+        </div>
+      </SettingsSection>
+
+      {deleteModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label="Close account dialog"
+            className="absolute inset-0 bg-slate-950/75 backdrop-blur-sm"
+            onClick={() => {
+              if (!closingAccount) {
+                setDeleteModalOpen(false);
+                setDeleteConfirmation("");
+              }
+            }}
+          />
+          <Card className="relative z-10 w-full max-w-2xl border border-rose-400/16 bg-slate-950/95 p-6 shadow-[0_28px_80px_rgba(2,8,23,0.7)]">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-rose-400/18 bg-rose-400/[0.08] text-rose-100">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] uppercase tracking-[0.24em] text-rose-200/70">Destructive action</p>
+                <h3 className="mt-2 font-display text-3xl text-white">Confirm account closure</h3>
+                <p className="mt-3 text-sm leading-7 text-slate-300">
+                  Closing your account removes access to the app and invalidates active sessions. Some commercial records may remain so past purchases, licenses, and sales continue to make sense historically.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 rounded-[24px] border border-white/10 bg-black/20 p-5">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-100">
+                  Type DELETE to confirm
+                </label>
+                <Input
+                  value={deleteConfirmation}
+                  onChange={(event) => setDeleteConfirmation(event.target.value)}
+                  placeholder="Type DELETE to continue"
+                  autoFocus
+                />
+              </div>
+              <div className="rounded-[20px] border border-white/10 bg-white/[0.03] p-4 text-sm leading-7 text-slate-400">
+                This account will no longer behave like an active workspace account after closure. Recovery is not currently supported in-product.
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  if (!closingAccount) {
+                    setDeleteModalOpen(false);
+                    setDeleteConfirmation("");
+                  }
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                className="border-rose-400/20 bg-rose-400/[0.08] text-rose-100 hover:bg-rose-400/[0.14]"
+                onClick={() => void handleCloseAccount()}
+                disabled={closingAccount || deleteConfirmation !== "DELETE"}
+              >
+                {closingAccount ? "Closing account..." : "Close account permanently"}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      ) : null}
+    </>
+  );
+
   if (user.role !== "creator") {
     return (
       <AppShell title="Settings" subtitle="Account and business" navItems={navItems}>
@@ -259,6 +402,7 @@ export function SettingsPage() {
               </Button>
             </form>
           </SettingsSection>
+          {dangerZone}
         </div>
       </AppShell>
     );
@@ -623,6 +767,7 @@ export function SettingsPage() {
             </div>
           </div>
         </SettingsSection>
+        {dangerZone}
       </div>
     </AppShell>
   );

@@ -502,8 +502,7 @@ export function LicenseDetailDrawer({
                     <p className="text-sm font-medium">Delete license</p>
                   </div>
                   <p className="mt-1 text-sm leading-6 text-slate-400">
-                    Deleting this license also removes linked purchases through the
-                    existing database relationships.
+                    CauFlow blocks deletion when this license is already used by packs, purchases, or granted rights. Commercial history stays protected.
                   </p>
                 </div>
                 <Button

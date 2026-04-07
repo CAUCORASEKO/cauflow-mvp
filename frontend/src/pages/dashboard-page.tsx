@@ -84,6 +84,22 @@ const resolveWorkspaceSection = (hash: string): WorkspaceSection => {
   return "assets";
 };
 
+const formatDependencySummary = (segments: string[]) => {
+  if (segments.length === 0) {
+    return "";
+  }
+
+  if (segments.length === 1) {
+    return segments[0];
+  }
+
+  if (segments.length === 2) {
+    return `${segments[0]} and ${segments[1]}`;
+  }
+
+  return `${segments.slice(0, -1).join(", ")}, and ${segments[segments.length - 1]}`;
+};
+
 export function DashboardPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [packs, setPacks] = useState<Pack[]>([]);
@@ -282,6 +298,11 @@ export function DashboardPage() {
     );
     setSelectedAssetId(updatedAsset.id);
     setLastSyncedAt(new Date());
+    setWorkspaceNotice({
+      tone: "success",
+      message: "Asset updated",
+      detail: "The latest metadata is now reflected across the workspace."
+    });
   }, []);
 
   const handleLicenseCreated = useCallback((license: License) => {
@@ -313,6 +334,11 @@ export function DashboardPage() {
     );
     setSelectedPackId(updatedPack.id);
     setLastSyncedAt(new Date());
+    setWorkspaceNotice({
+      tone: "success",
+      message: "Pack updated",
+      detail: "Commercial bundle changes are now live in the workspace."
+    });
   }, []);
 
   const handleDeleteAsset = useCallback(async () => {
@@ -323,51 +349,30 @@ export function DashboardPage() {
     try {
       setIsDeletingAsset(true);
       const deletedAsset = await deleteAsset(assetPendingDelete.id);
-      const deletedLicenseIds = new Set(
-        licenses
-          .filter((license) => license.assetId === deletedAsset.id)
-          .map((license) => license.id)
-      );
-      const nextPacks = await getPacks();
-
-      setAssets((currentAssets) =>
-        currentAssets.filter((asset) => asset.id !== deletedAsset.id)
-      );
-      setPacks(nextPacks);
-      setLicenses((currentLicenses) =>
-        currentLicenses.filter((license) => license.assetId !== deletedAsset.id)
-      );
-      setPurchases((currentPurchases) =>
-        currentPurchases.filter(
-          (purchase) => !deletedLicenseIds.has(purchase.licenseId)
-        )
-      );
+      await loadDashboard();
       setSelectedAssetId((currentSelectedAssetId) =>
         currentSelectedAssetId === deletedAsset.id ? null : currentSelectedAssetId
       );
-      setSelectedLicenseId((currentSelectedLicenseId) =>
-        currentSelectedLicenseId !== null && deletedLicenseIds.has(currentSelectedLicenseId)
-          ? null
-          : currentSelectedLicenseId
-      );
+      setSelectedLicenseId(null);
       setAssetPendingDelete(null);
       setLastSyncedAt(new Date());
       setWorkspaceNotice({
         tone: "success",
         message: "Asset deleted",
-        detail:
-          "Linked licenses and purchases were removed from the workspace state as well."
+        detail: "The asset has been removed from the creator catalog."
       });
     } catch (deleteError) {
       setWorkspaceNotice({
         tone: "error",
         message:
-          deleteError instanceof Error ? deleteError.message : "Unable to delete asset"
+          deleteError instanceof Error ? deleteError.message : "Unable to delete asset",
+        detail:
+          "If this asset is already used in packs, licenses, or commercial history, remove the dependency before deleting."
       });
     } finally {
       setIsDeletingAsset(false);
     }
-  }, [assetPendingDelete, licenses, purchases]);
+  }, [assetPendingDelete, loadDashboard]);
 
   const handleLicenseUpdated = useCallback((updatedLicense: License) => {
     setLicenses((currentLicenses) =>
@@ -382,6 +387,11 @@ export function DashboardPage() {
     );
     setSelectedLicenseId(updatedLicense.id);
     setLastSyncedAt(new Date());
+    setWorkspaceNotice({
+      tone: "success",
+      message: "License updated",
+      detail: "The rights package now reflects the latest pricing and policy settings."
+    });
   }, []);
 
   const handleDeleteLicense = useCallback(async () => {
@@ -392,22 +402,7 @@ export function DashboardPage() {
     try {
       setIsDeletingLicense(true);
       const deletedLicense = await deleteLicense(licensePendingDelete.id);
-
-      setLicenses((currentLicenses) =>
-        currentLicenses.filter((license) => license.id !== deletedLicense.id)
-      );
-      setPacks((currentPacks) =>
-        currentPacks.map((pack) =>
-          pack.licenseId === deletedLicense.id
-            ? { ...pack, licenseId: null, license: null }
-            : pack
-        )
-      );
-      setPurchases((currentPurchases) =>
-        currentPurchases.filter(
-          (purchase) => purchase.licenseId !== deletedLicense.id
-        )
-      );
+      await loadDashboard();
       setSelectedLicenseId((currentSelectedLicenseId) =>
         currentSelectedLicenseId === deletedLicense.id ? null : currentSelectedLicenseId
       );
@@ -416,18 +411,20 @@ export function DashboardPage() {
       setWorkspaceNotice({
         tone: "success",
         message: "License deleted",
-        detail: "Linked purchases were removed from the workspace state as well."
+        detail: "The rights package has been removed from the creator catalog."
       });
     } catch (deleteError) {
       setWorkspaceNotice({
         tone: "error",
         message:
-          deleteError instanceof Error ? deleteError.message : "Unable to delete license"
+          deleteError instanceof Error ? deleteError.message : "Unable to delete license",
+        detail:
+          "Purchased or granted licenses stay protected. Remove non-commercial dependencies before deleting."
       });
     } finally {
       setIsDeletingLicense(false);
     }
-  }, [licensePendingDelete, purchases]);
+  }, [licensePendingDelete, loadDashboard]);
 
   const handleDeletePack = useCallback(async () => {
     if (!packPendingDelete) {
@@ -437,9 +434,7 @@ export function DashboardPage() {
     try {
       setIsDeletingPack(true);
       const deletedPack = await deletePack(packPendingDelete.id);
-      setPacks((currentPacks) =>
-        currentPacks.filter((pack) => pack.id !== deletedPack.id)
-      );
+      await loadDashboard();
       setSelectedPackId((currentSelectedPackId) =>
         currentSelectedPackId === deletedPack.id ? null : currentSelectedPackId
       );
@@ -448,18 +443,88 @@ export function DashboardPage() {
       setWorkspaceNotice({
         tone: "success",
         message: "Pack deleted",
-        detail: "The bundled product and its included-asset associations were removed."
+        detail: "The bundled product has been removed from the creator catalog."
       });
     } catch (deleteError) {
       setWorkspaceNotice({
         tone: "error",
         message:
-          deleteError instanceof Error ? deleteError.message : "Unable to delete pack"
+          deleteError instanceof Error ? deleteError.message : "Unable to delete pack",
+        detail:
+          "Packs with purchase or grant history stay protected so commercial records remain intact."
       });
     } finally {
       setIsDeletingPack(false);
     }
-  }, [packPendingDelete]);
+  }, [loadDashboard, packPendingDelete]);
+
+  const assetDeleteDescription = useMemo(() => {
+    if (!assetPendingDelete) {
+      return "Delete this asset from the catalog. This action cannot be undone.";
+    }
+
+    const linkedLicenseCount = licenses.filter(
+      (license) => license.assetId === assetPendingDelete.id
+    ).length;
+    const packCoverCount = packs.filter(
+      (pack) => pack.coverAssetId === assetPendingDelete.id
+    ).length;
+    const packInclusionCount = packs.filter((pack) =>
+      pack.assets?.some((item) => item.assetId === assetPendingDelete.id)
+    ).length;
+    const purchaseCount = purchases.filter(
+      (purchase) =>
+        purchase.assetId === assetPendingDelete.id ||
+        purchase.asset?.id === assetPendingDelete.id
+    ).length;
+
+    const segments = [];
+    if (linkedLicenseCount > 0) segments.push(`${linkedLicenseCount} linked licenses`);
+    if (packCoverCount > 0) segments.push(`${packCoverCount} pack covers`);
+    if (packInclusionCount > 0) segments.push(`${packInclusionCount} pack inclusions`);
+    if (purchaseCount > 0) segments.push(`${purchaseCount} commercial records`);
+
+    return segments.length > 0
+      ? `This asset is currently connected to ${formatDependencySummary(
+          segments
+        )}. CauFlow will block deletion while those dependencies exist.`
+      : "This action permanently removes the asset from the creator catalog. This action cannot be undone.";
+  }, [assetPendingDelete, licenses, packs, purchases]);
+
+  const licenseDeleteDescription = useMemo(() => {
+    if (!licensePendingDelete) {
+      return "Delete this rights package from the catalog. This action cannot be undone.";
+    }
+
+    const packCount = packs.filter((pack) => pack.licenseId === licensePendingDelete.id).length;
+    const purchaseCount = purchases.filter(
+      (purchase) => purchase.licenseId === licensePendingDelete.id
+    ).length;
+
+    const segments = [];
+    if (packCount > 0) segments.push(`${packCount} packs`);
+    if (purchaseCount > 0) segments.push(`${purchaseCount} purchase records`);
+
+    return segments.length > 0
+      ? `This license is currently referenced by ${formatDependencySummary(
+          segments
+        )}. Purchased or bundled rights packages cannot be removed.`
+      : "This action permanently removes the rights package from the creator catalog. This action cannot be undone.";
+  }, [licensePendingDelete, packs, purchases]);
+
+  const packDeleteDescription = useMemo(() => {
+    if (!packPendingDelete) {
+      return "Delete this pack from the catalog. Existing assets and licenses will stay intact.";
+    }
+
+    const purchaseCount = purchases.filter(
+      (purchase) => purchase.packId === packPendingDelete.id || purchase.pack?.id === packPendingDelete.id
+    ).length;
+
+    return purchaseCount > 0
+      ? `This pack is already tied to ${purchaseCount} commercial records. CauFlow will block deletion so purchase and grant history stays intact.`
+      : "This action removes the pack and its bundle structure from the catalog. Existing assets and licenses will stay intact.";
+  }, [packPendingDelete, purchases]);
 
   const hasSearchFilters =
     searchQuery.trim().length > 0 || imageFilter !== "all" || sortOrder !== "newest";
@@ -815,7 +880,7 @@ export function DashboardPage() {
       <ConfirmDialog
         open={Boolean(assetPendingDelete)}
         title={assetPendingDelete ? `Delete ${assetPendingDelete.title}?` : "Delete asset?"}
-        description="This will remove the asset and cascade through any linked licenses and purchases. The action cannot be undone."
+        description={assetDeleteDescription}
         confirmLabel="Delete asset"
         isConfirming={isDeletingAsset}
         onClose={() => {
@@ -833,7 +898,7 @@ export function DashboardPage() {
             ? `Delete ${licensePendingDelete.type} license?`
             : "Delete license?"
         }
-        description="This will remove the license and cascade through any linked purchases. The action cannot be undone."
+        description={licenseDeleteDescription}
         confirmLabel="Delete license"
         isConfirming={isDeletingLicense}
         onClose={() => {
@@ -847,7 +912,7 @@ export function DashboardPage() {
       <ConfirmDialog
         open={Boolean(packPendingDelete)}
         title={packPendingDelete ? `Delete ${packPendingDelete.title}?` : "Delete pack?"}
-        description="This removes the creative pack and its included-asset bundle structure. Existing assets and licenses stay in the catalog."
+        description={packDeleteDescription}
         confirmLabel="Delete pack"
         isConfirming={isDeletingPack}
         onClose={() => {

@@ -102,7 +102,7 @@ export interface Pack {
 
 export type UserRole = "creator" | "buyer" | "admin";
 
-export type AccountStatus = "active" | "suspended" | "restricted";
+export type AccountStatus = "active" | "suspended" | "restricted" | "closed";
 
 export type PayoutOnboardingStatus =
   | "not_started"

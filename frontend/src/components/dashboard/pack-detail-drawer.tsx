@@ -510,6 +510,30 @@ export function PackDetailDrawer({
                 </form>
               ) : null}
 
+              <section className="rounded-[26px] border border-rose-400/10 bg-rose-400/[0.04] p-5">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 text-white">
+                      <Trash2 className="h-4 w-4 text-rose-200" />
+                      <p className="text-sm font-medium">Delete pack</p>
+                    </div>
+                    <p className="mt-1 text-sm leading-6 text-slate-400">
+                      CauFlow blocks deletion when this pack is already tied to purchase or grant history. Existing assets and licenses stay untouched.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="gap-2 border-rose-400/20 bg-rose-400/[0.08] text-rose-100 hover:bg-rose-400/[0.14]"
+                    onClick={() => onDeleteRequest(pack)}
+                    disabled={isDeleting || isSaving}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    {isDeleting ? "Deleting..." : "Delete pack"}
+                  </Button>
+                </div>
+              </section>
+
               <section className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
                 <div className="flex items-center justify-between gap-3">
                   <div>

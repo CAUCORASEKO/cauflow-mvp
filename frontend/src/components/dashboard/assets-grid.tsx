@@ -1,4 +1,4 @@
-import { Eye, FileImage, ImageIcon, Trash2 } from "lucide-react";
+import { Eye, FileImage, ImageIcon, PencilLine, Trash2 } from "lucide-react";
 import { getAssetImageUrl } from "@/services/api";
 import type { Asset, License, Purchase } from "@/types/api";
 import { formatDate } from "@/lib/utils";
@@ -145,14 +145,24 @@ export function AssetsGrid({
                     <span className="text-xs uppercase tracking-[0.18em] text-slate-500">
                       Catalog status
                     </span>
-                    <button
-                      type="button"
-                      className="focus-ring inline-flex items-center gap-2 rounded-full border border-sky-300/15 bg-sky-300/8 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-sky-100 transition-all duration-300 hover:bg-sky-300/14"
-                      onClick={() => onSelectAsset(asset)}
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                      Open detail
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="focus-ring inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-white transition-all duration-300 hover:bg-white/[0.08]"
+                        onClick={() => onSelectAsset(asset)}
+                      >
+                        <PencilLine className="h-3.5 w-3.5" />
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="focus-ring inline-flex items-center gap-2 rounded-full border border-sky-300/15 bg-sky-300/8 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-sky-100 transition-all duration-300 hover:bg-sky-300/14"
+                        onClick={() => onSelectAsset(asset)}
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        Open detail
+                      </button>
+                    </div>
                   </div>
                 </div>
               </>
@@ -201,6 +211,14 @@ export function AssetsGrid({
                 </button>
 
                 <div className="flex flex-col items-start gap-2 md:items-end">
+                  <button
+                    type="button"
+                    className="focus-ring inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-white transition hover:bg-white/[0.08]"
+                    onClick={() => onSelectAsset(asset)}
+                  >
+                    <PencilLine className="h-3.5 w-3.5" />
+                    Edit
+                  </button>
                   <button
                     type="button"
                     className="focus-ring inline-flex items-center gap-2 rounded-full border border-sky-300/15 bg-sky-300/8 px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-sky-100 transition hover:bg-sky-300/14"

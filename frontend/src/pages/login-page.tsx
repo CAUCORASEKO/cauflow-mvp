@@ -12,6 +12,7 @@ export function LoginPage() {
   const { user, logIn, resendVerificationEmail } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const locationState = location.state as { from?: { pathname?: string }; message?: string } | null;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -32,8 +33,7 @@ export function LoginPage() {
 
     try {
       const account = await logIn({ email, password });
-      const nextPath = (location.state as { from?: { pathname?: string } } | null)?.from
-        ?.pathname;
+      const nextPath = locationState?.from?.pathname;
       navigate(nextPath || getAuthenticatedHomePath(account), { replace: true });
     } catch (submissionError) {
       if (submissionError instanceof ApiError && submissionError.code === "EMAIL_VERIFICATION_REQUIRED") {
@@ -111,6 +111,9 @@ export function LoginPage() {
                 : "Use the link in your verification email, or resend it below."
             }
           />
+        ) : null}
+        {!showVerificationHelp && locationState?.message ? (
+          <ActionFeedback tone="success" message={locationState.message} />
         ) : null}
         {error ? <ActionFeedback tone="error" message={error} /> : null}
         <div className="flex items-center justify-between gap-3 pt-2">

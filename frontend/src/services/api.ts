@@ -533,6 +533,18 @@ export const updateWalletSettings = async (input: Partial<Account>) => {
   return handleResponse<Account>(response);
 };
 
+export const closeAccount = async (confirmation: string) => {
+  const response = await fetch(`${API_BASE_URL}/account/close`, {
+    method: "POST",
+    headers: getAuthHeaders({
+      "Content-Type": "application/json"
+    }),
+    body: JSON.stringify({ confirmation })
+  });
+
+  return handleResponse<{ success: boolean }>(response);
+};
+
 export const fetchExploreFeed = async () => {
   const response = await fetch(`${API_BASE_URL}/platform/explore`, {
     headers: getAuthHeaders()

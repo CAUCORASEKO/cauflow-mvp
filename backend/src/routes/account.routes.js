@@ -1,5 +1,6 @@
 import express from "express";
 import {
+  closeAccount,
   getAccount,
   updateBusinessSettings,
   updateLicensingDefaults,
@@ -16,5 +17,6 @@ router.patch("/profile", requireAuth, uploadAvatarImage, updateProfile);
 router.patch("/business", requireAuth, updateBusinessSettings);
 router.patch("/licensing-defaults", requireAuth, updateLicensingDefaults);
 router.patch("/wallet", requireAuth, updateWalletSettings);
+router.post("/close", requireAuth, closeAccount);
 
 export default router;

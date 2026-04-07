@@ -10,6 +10,7 @@ const SESSION_TTL_DAYS = 30;
 const TOKEN_TTL_HOURS = 24;
 const PUBLIC_SIGNUP_ROLES = new Set(["creator", "buyer"]);
 const PASSWORD_MIN_LENGTH = 8;
+const CLOSED_ACCOUNT_STATUSES = new Set(["closed", "suspended"]);
 
 const sendError = (res, status, message, code, error) =>
   res.status(status).json({
@@ -231,7 +232,7 @@ export const logIn = async (req, res) => {
     const normalizedEmail = normalizeEmail(email);
     const userResult = await client.query(
       `
-      SELECT id, password_hash, email_verified
+      SELECT id, password_hash, email_verified, account_status
       FROM users
       WHERE email = $1
       LIMIT 1
@@ -248,6 +249,26 @@ export const logIn = async (req, res) => {
 
     if (!validPassword) {
       return sendError(res, 401, "Invalid email or password", "INVALID_CREDENTIALS");
+    }
+
+    if (CLOSED_ACCOUNT_STATUSES.has(user.account_status)) {
+      return sendError(
+        res,
+        403,
+        user.account_status === "closed"
+          ? "This account has been closed and can no longer be used."
+          : "This account is suspended and cannot sign in.",
+        user.account_status === "closed" ? "ACCOUNT_CLOSED" : "ACCOUNT_SUSPENDED"
+      );
+    }
+
+    if (user.account_status === "restricted") {
+      return sendError(
+        res,
+        403,
+        "This account is restricted and cannot sign in right now.",
+        "ACCOUNT_RESTRICTED"
+      );
     }
 
     if (!user.email_verified) {

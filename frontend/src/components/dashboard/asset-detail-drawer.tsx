@@ -531,8 +531,7 @@ export function AssetDetailDrawer({
                     <p className="text-sm font-medium">Delete asset</p>
                   </div>
                   <p className="mt-1 text-sm leading-6 text-slate-400">
-                    Deleting this asset also removes linked licenses and purchases
-                    through the existing database relationships.
+                    CauFlow blocks deletion when this asset is already used by packs, licenses, or commercial history. Remove the dependency before deleting.
                   </p>
                 </div>
                 <Button

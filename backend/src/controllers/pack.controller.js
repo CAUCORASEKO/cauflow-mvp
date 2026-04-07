@@ -1,5 +1,6 @@
 import { pool } from "../config/db.js";
 import { normalizeResponseData } from "../utils/normalize-response.js";
+import { buildPackDeleteBlockMessage } from "../utils/delete-constraints.js";
 
 const PACK_STATUSES = new Set(["draft", "published"]);
 const PACK_CATEGORIES = new Set([
@@ -491,6 +492,54 @@ export const deletePack = async (req, res) => {
   try {
     const packId = Number(req.params.id);
 
+    const packResult = await pool.query(
+      `
+      SELECT *
+      FROM packs
+      WHERE id = $1
+        AND ($2 = 'admin' OR owner_user_id = $3)
+      LIMIT 1
+      `,
+      [packId, req.user.role, req.user.id]
+    );
+
+    if (packResult.rows.length === 0) {
+      return res.status(404).json({
+        message: "Pack not found"
+      });
+    }
+
+    const [purchaseResult, grantResult] = await Promise.all([
+      pool.query(
+        `
+        SELECT COUNT(*)::int AS value
+        FROM purchases
+        WHERE pack_id = $1
+        `,
+        [packId]
+      ),
+      pool.query(
+        `
+        SELECT COUNT(*)::int AS value
+        FROM license_grants
+        WHERE pack_id = $1
+        `,
+        [packId]
+      )
+    ]);
+
+    const dependencyCounts = {
+      purchaseCount: purchaseResult.rows[0]?.value || 0,
+      grantCount: grantResult.rows[0]?.value || 0
+    };
+
+    if (dependencyCounts.purchaseCount > 0 || dependencyCounts.grantCount > 0) {
+      return res.status(409).json({
+        message: buildPackDeleteBlockMessage(dependencyCounts),
+        code: "PACK_DELETE_BLOCKED"
+      });
+    }
+
     const result = await pool.query(
       `
       DELETE FROM packs
@@ -501,15 +550,9 @@ export const deletePack = async (req, res) => {
       [packId, req.user.role, req.user.id]
     );
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        message: "Pack not found"
-      });
-    }
-
     res.status(200).json({
       message: "Pack deleted successfully",
-      data: normalizeResponseData(result.rows[0])
+      data: normalizeResponseData(result.rows[0] || packResult.rows[0])
     });
   } catch (error) {
     res.status(500).json({

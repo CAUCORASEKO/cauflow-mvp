@@ -4,6 +4,7 @@ import {
   getDefaultLicensePolicy,
   validateAndBuildPolicy
 } from "../utils/license-policy.js";
+import { buildLicenseDeleteBlockMessage } from "../utils/delete-constraints.js";
 
 const fetchPolicyByLicenseId = async (db, licenseId) => {
   const result = await db.query(
@@ -345,6 +346,67 @@ export const deleteLicense = async (req, res) => {
   try {
     const licenseId = Number(req.params.id);
 
+    const licenseResult = await pool.query(
+      `
+      SELECT *
+      FROM licenses
+      WHERE id = $1
+        AND ($2 = 'admin' OR owner_user_id = $3)
+      LIMIT 1
+      `,
+      [licenseId, req.user.role, req.user.id]
+    );
+
+    if (licenseResult.rows.length === 0) {
+      return res.status(404).json({
+        message: "License not found"
+      });
+    }
+
+    const [packResult, purchaseResult, grantResult] = await Promise.all([
+      pool.query(
+        `
+        SELECT COUNT(*)::int AS value
+        FROM packs
+        WHERE license_id = $1
+        `,
+        [licenseId]
+      ),
+      pool.query(
+        `
+        SELECT COUNT(*)::int AS value
+        FROM purchases
+        WHERE license_id = $1
+        `,
+        [licenseId]
+      ),
+      pool.query(
+        `
+        SELECT COUNT(*)::int AS value
+        FROM license_grants
+        WHERE license_id = $1
+        `,
+        [licenseId]
+      )
+    ]);
+
+    const dependencyCounts = {
+      packCount: packResult.rows[0]?.value || 0,
+      purchaseCount: purchaseResult.rows[0]?.value || 0,
+      grantCount: grantResult.rows[0]?.value || 0
+    };
+
+    if (
+      dependencyCounts.packCount > 0 ||
+      dependencyCounts.purchaseCount > 0 ||
+      dependencyCounts.grantCount > 0
+    ) {
+      return res.status(409).json({
+        message: buildLicenseDeleteBlockMessage(dependencyCounts),
+        code: "LICENSE_DELETE_BLOCKED"
+      });
+    }
+
     const result = await pool.query(
       `
       DELETE FROM licenses
@@ -355,15 +417,9 @@ export const deleteLicense = async (req, res) => {
       [licenseId, req.user.role, req.user.id]
     );
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        message: "License not found"
-      });
-    }
-
     res.status(200).json({
       message: "License deleted successfully",
-      data: normalizeResponseData(result.rows[0])
+      data: normalizeResponseData(result.rows[0] || licenseResult.rows[0])
     });
   } catch (error) {
     res.status(500).json({

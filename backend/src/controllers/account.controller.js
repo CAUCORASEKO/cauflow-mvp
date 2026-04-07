@@ -215,3 +215,77 @@ export const updateWalletSettings = async (req, res) => {
     });
   }
 };
+
+export const closeAccount = async (req, res) => {
+  const client = await pool.connect();
+  let transactionStarted = false;
+
+  try {
+    const { confirmation } = req.body || {};
+
+    if (confirmation !== "DELETE") {
+      return res.status(400).json({
+        message: "Type DELETE to confirm account closure",
+        code: "INVALID_ACCOUNT_CLOSURE_CONFIRMATION"
+      });
+    }
+
+    await client.query("BEGIN");
+    transactionStarted = true;
+
+    await client.query(
+      `
+      UPDATE users
+      SET account_status = 'closed',
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1
+      `,
+      [req.user.id]
+    );
+
+    await client.query(
+      `
+      DELETE FROM user_sessions
+      WHERE user_id = $1
+      `,
+      [req.user.id]
+    );
+
+    await client.query(
+      `
+      DELETE FROM email_verification_tokens
+      WHERE user_id = $1
+      `,
+      [req.user.id]
+    );
+
+    await client.query(
+      `
+      DELETE FROM password_reset_tokens
+      WHERE user_id = $1
+      `,
+      [req.user.id]
+    );
+
+    await client.query("COMMIT");
+    transactionStarted = false;
+
+    res.status(200).json({
+      message: "Account closed successfully",
+      data: {
+        success: true
+      }
+    });
+  } catch (error) {
+    if (transactionStarted) {
+      await client.query("ROLLBACK");
+    }
+
+    res.status(500).json({
+      message: "Error closing account",
+      error: error.message
+    });
+  } finally {
+    client.release();
+  }
+};

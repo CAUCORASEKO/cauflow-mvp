@@ -3,6 +3,7 @@ import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import { normalizeResponseData } from "../utils/normalize-response.js";
+import { buildAssetDeleteBlockMessage } from "../utils/delete-constraints.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -193,6 +194,82 @@ export const deleteAsset = async (req, res) => {
   try {
     const assetId = Number(req.params.id);
 
+    const assetResult = await pool.query(
+      `
+      SELECT *
+      FROM assets
+      WHERE id = $1
+        AND ($2 = 'admin' OR owner_user_id = $3)
+      LIMIT 1
+      `,
+      [assetId, req.user.role, req.user.id]
+    );
+
+    if (assetResult.rows.length === 0) {
+      return res.status(404).json({
+        message: "Asset not found"
+      });
+    }
+
+    const [packCoverResult, packInclusionResult, licenseResult, purchaseResult, grantResult] =
+      await Promise.all([
+        pool.query(
+          `
+          SELECT COUNT(*)::int AS value
+          FROM packs
+          WHERE cover_asset_id = $1
+          `,
+          [assetId]
+        ),
+        pool.query(
+          `
+          SELECT COUNT(*)::int AS value
+          FROM pack_assets
+          WHERE asset_id = $1
+          `,
+          [assetId]
+        ),
+        pool.query(
+          `
+          SELECT COUNT(*)::int AS value
+          FROM licenses
+          WHERE asset_id = $1
+          `,
+          [assetId]
+        ),
+        pool.query(
+          `
+          SELECT COUNT(*)::int AS value
+          FROM purchases
+          WHERE asset_id = $1
+          `,
+          [assetId]
+        ),
+        pool.query(
+          `
+          SELECT COUNT(*)::int AS value
+          FROM license_grants
+          WHERE asset_id = $1
+          `,
+          [assetId]
+        )
+      ]);
+
+    const dependencyCounts = {
+      packCoverCount: packCoverResult.rows[0]?.value || 0,
+      packInclusionCount: packInclusionResult.rows[0]?.value || 0,
+      licenseCount: licenseResult.rows[0]?.value || 0,
+      purchaseCount: purchaseResult.rows[0]?.value || 0,
+      grantCount: grantResult.rows[0]?.value || 0
+    };
+
+    if (Object.values(dependencyCounts).some((count) => count > 0)) {
+      return res.status(409).json({
+        message: buildAssetDeleteBlockMessage(dependencyCounts),
+        code: "ASSET_DELETE_BLOCKED"
+      });
+    }
+
     const result = await pool.query(
       `
       DELETE FROM assets
@@ -209,7 +286,7 @@ export const deleteAsset = async (req, res) => {
       });
     }
 
-    const deletedAsset = result.rows[0];
+    const deletedAsset = result.rows[0] || assetResult.rows[0];
 
     if (deletedAsset.image_url?.startsWith("/uploads/")) {
       const relativeUploadPath = deletedAsset.image_url.replace(/^\//, "");
@@ -222,13 +299,6 @@ export const deleteAsset = async (req, res) => {
       data: normalizeResponseData(deletedAsset)
     });
   } catch (error) {
-    if (error.code === "23503") {
-      return res.status(409).json({
-        message: "Asset is used as a pack cover and cannot be deleted",
-        error: error.message
-      });
-    }
-
     res.status(500).json({
       message: "Error deleting asset",
       error: error.message
