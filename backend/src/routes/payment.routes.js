@@ -1,7 +1,8 @@
 import express from "express";
 import {
   completeCheckoutSession,
-  createCheckoutSession
+  createCheckoutSession,
+  getCheckoutSession
 } from "../controllers/payment.controller.js";
 import { requireAuth, requireRole, requireVerifiedAccount } from "../middleware/auth.middleware.js";
 
@@ -13,6 +14,13 @@ router.post(
   requireVerifiedAccount,
   requireRole("buyer", "admin"),
   createCheckoutSession
+);
+router.get(
+  "/checkout-sessions/:id",
+  requireAuth,
+  requireVerifiedAccount,
+  requireRole("buyer", "admin"),
+  getCheckoutSession
 );
 router.post(
   "/checkout-sessions/:id/complete",

@@ -1,6 +1,7 @@
 import { pool } from "../config/db.js";
 import { normalizeResponseData } from "../utils/normalize-response.js";
 import { fetchAccountByUserId } from "../utils/account.js";
+import { buildGrantSelect, buildPurchaseSelect } from "../utils/commerce.js";
 
 const getScalar = async (db, query, params = []) => {
   const result = await db.query(query, params);
@@ -12,18 +13,141 @@ export const getExploreFeed = async (req, res) => {
     const [assetsResult, packsResult, licensesResult] = await Promise.all([
       pool.query(
         `
-        SELECT id, title, description, image_url, created_at
-        FROM assets
-        ORDER BY created_at DESC
+        SELECT
+          a.id,
+          a.title,
+          a.description,
+          a.image_url,
+          a.created_at,
+          a.owner_user_id,
+          row_to_json(creator_summary) AS creator,
+          COALESCE(creator_settings.payout_onboarding_status, 'not_started') AS monetization_status,
+          COALESCE(creator_settings.payout_onboarding_status, 'not_started') = 'active' AS monetization_ready,
+          CASE
+            WHEN license_options.items IS NULL THEN 'No license options available yet'
+            WHEN COALESCE(creator_settings.payout_onboarding_status, 'not_started') <> 'active'
+              THEN 'Creator payout onboarding is not active yet'
+            ELSE NULL
+          END AS purchase_blocked_reason,
+          COALESCE(license_options.items, '[]'::json) AS license_options
+        FROM assets a
+        LEFT JOIN creator_settings
+          ON creator_settings.user_id = a.owner_user_id
+        LEFT JOIN LATERAL (
+          SELECT
+            u.id,
+            u.email,
+            p.public_display_name,
+            p.organization_name,
+            p.studio_name
+          FROM users u
+          LEFT JOIN profiles p
+            ON p.user_id = u.id
+          WHERE u.id = a.owner_user_id
+        ) AS creator_summary ON true
+        LEFT JOIN LATERAL (
+          SELECT json_agg(
+            json_build_object(
+              'id', l.id,
+              'asset_id', l.asset_id,
+              'type', l.type,
+              'price', l.price,
+              'usage', l.usage,
+              'created_at', l.created_at,
+              'policy', (
+                SELECT row_to_json(lp)
+                FROM (
+                  SELECT *
+                  FROM license_policies
+                  WHERE license_id = l.id
+                ) AS lp
+              )
+            )
+            ORDER BY l.price ASC, l.id ASC
+          ) AS items
+          FROM licenses l
+          WHERE l.asset_id = a.id
+        ) AS license_options ON true
+        ORDER BY a.created_at DESC
         LIMIT 12
         `
       ),
       pool.query(
         `
-        SELECT id, title, description, price, status, category, cover_asset_id, created_at, updated_at
-        FROM packs
-        WHERE status = 'published'
-        ORDER BY updated_at DESC
+        SELECT
+          p.id,
+          p.title,
+          p.description,
+          p.price,
+          p.status,
+          p.category,
+          p.cover_asset_id,
+          p.created_at,
+          p.updated_at,
+          p.owner_user_id,
+          (
+            SELECT COUNT(*)::int
+            FROM pack_assets pa
+            WHERE pa.pack_id = p.id
+          ) AS asset_count,
+          row_to_json(cover_asset) AS cover_asset,
+          row_to_json(base_license) AS license,
+          row_to_json(creator_summary) AS creator,
+          COALESCE(cs.payout_onboarding_status, 'not_started') AS monetization_status,
+          COALESCE(cs.payout_onboarding_status, 'not_started') = 'active' AS monetization_ready,
+          CASE
+            WHEN p.license_id IS NULL THEN 'No pack license is attached yet'
+            WHEN COALESCE(cs.payout_onboarding_status, 'not_started') <> 'active'
+              THEN 'Creator payout onboarding is not active yet'
+            ELSE NULL
+          END AS purchase_blocked_reason
+        FROM packs p
+        LEFT JOIN creator_settings cs
+          ON cs.user_id = p.owner_user_id
+        LEFT JOIN LATERAL (
+          SELECT
+            a.id,
+            a.title,
+            a.description,
+            a.image_url,
+            a.created_at,
+            a.owner_user_id
+          FROM assets a
+          WHERE a.id = p.cover_asset_id
+        ) AS cover_asset ON true
+        LEFT JOIN LATERAL (
+          SELECT
+            l.id,
+            l.asset_id,
+            l.type,
+            l.price,
+            l.usage,
+            l.created_at,
+            (
+              SELECT row_to_json(lp)
+              FROM (
+                SELECT *
+                FROM license_policies
+                WHERE license_id = l.id
+              ) AS lp
+            ) AS policy
+          FROM licenses l
+          WHERE l.id = p.license_id
+        ) AS base_license ON true
+        LEFT JOIN LATERAL (
+          SELECT
+            u.id,
+            u.email,
+            pr.public_display_name,
+            pr.organization_name,
+            pr.studio_name
+          FROM users u
+          LEFT JOIN profiles pr
+            ON pr.user_id = u.id
+          WHERE u.id = p.owner_user_id
+        ) AS creator_summary ON true
+        WHERE p.status = 'published'
+        ORDER BY p.updated_at DESC
         LIMIT 12
         `
       ),
@@ -79,10 +203,8 @@ export const getRoleDashboard = async (req, res) => {
 
       const recentPurchases = await pool.query(
         `
-        SELECT *
-        FROM purchases
-        WHERE creator_user_id = $1
-        ORDER BY created_at DESC
+        ${buildPurchaseSelect("p.creator_user_id = $1")}
+        ORDER BY p.created_at DESC
         LIMIT 6
         `,
         [req.user.id]
@@ -137,10 +259,8 @@ export const getRoleDashboard = async (req, res) => {
 
       const recentPurchases = await pool.query(
         `
-        SELECT *
-        FROM purchases
-        WHERE buyer_user_id = $1
-        ORDER BY created_at DESC
+        ${buildPurchaseSelect("p.buyer_user_id = $1")}
+        ORDER BY p.created_at DESC
         LIMIT 6
         `,
         [req.user.id]
@@ -223,10 +343,8 @@ export const getEntitlements = async (req, res) => {
   try {
     const result = await pool.query(
       `
-      SELECT *
-      FROM license_grants
-      WHERE buyer_user_id = $1
-      ORDER BY created_at DESC
+      ${buildGrantSelect("lg.buyer_user_id = $1")}
+      ORDER BY lg.created_at DESC
       `,
       [req.user.id]
     );

@@ -573,6 +573,14 @@ export const createCheckoutSession = async (input: {
   return handleResponse<PaymentRecord>(response);
 };
 
+export const fetchCheckoutSession = async (checkoutSessionId: number) => {
+  const response = await fetch(`${API_BASE_URL}/payments/checkout-sessions/${checkoutSessionId}`, {
+    headers: getAuthHeaders()
+  });
+
+  return handleResponse<PaymentRecord>(response);
+};
+
 export const completeCheckoutSession = async (
   checkoutSessionId: number,
   status: PaymentRecord["status"] = "paid"

@@ -1,5 +1,6 @@
 import { pool } from "../config/db.js";
 import { normalizeResponseData } from "../utils/normalize-response.js";
+import { buildPurchaseSelect, fetchPurchaseById } from "../utils/commerce.js";
 
 export const createPurchase = async (req, res) => {
   try {
@@ -15,8 +16,11 @@ export const createPurchase = async (req, res) => {
 
     const licenseResult = await pool.query(
       `
-      SELECT * FROM licenses
-      WHERE id = $1
+      SELECT l.*, a.owner_user_id AS asset_owner_user_id
+      FROM licenses l
+      JOIN assets a
+        ON a.id = l.asset_id
+      WHERE l.id = $1
       `,
       [numericLicenseId]
     );
@@ -37,24 +41,28 @@ export const createPurchase = async (req, res) => {
         status,
         buyer_user_id,
         creator_user_id,
+        asset_id,
         payment_status
       )
-      VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING *
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING id
       `,
       [
         numericLicenseId,
         buyerEmail || req.user.email,
         "completed",
         req.user.id,
-        license.owner_user_id || null,
+        license.owner_user_id || license.asset_owner_user_id || null,
+        license.asset_id,
         "paid"
       ]
     );
 
+    const purchase = await fetchPurchaseById(pool, result.rows[0].id);
+
     res.status(201).json({
       message: "Purchase created successfully",
-      data: normalizeResponseData(result.rows[0])
+      data: normalizeResponseData(purchase)
     });
   } catch (error) {
     res.status(500).json({
@@ -69,23 +77,21 @@ export const getPurchases = async (req, res) => {
     const result =
       req.user.role === "admin"
         ? await pool.query(`
-            SELECT * FROM purchases
-            ORDER BY id ASC
+            ${buildPurchaseSelect()}
+            ORDER BY p.id ASC
           `)
         : req.user.role === "creator"
           ? await pool.query(
               `
-              SELECT * FROM purchases
-              WHERE creator_user_id = $1
-              ORDER BY id ASC
+              ${buildPurchaseSelect("p.creator_user_id = $1")}
+              ORDER BY p.id ASC
               `,
               [req.user.id]
             )
           : await pool.query(
               `
-              SELECT * FROM purchases
-              WHERE buyer_user_id = $1
-              ORDER BY id ASC
+              ${buildPurchaseSelect("p.buyer_user_id = $1")}
+              ORDER BY p.id ASC
               `,
               [req.user.id]
             );
@@ -105,21 +111,14 @@ export const getPurchases = async (req, res) => {
 export const getPurchaseById = async (req, res) => {
   try {
     const purchaseId = Number(req.params.id);
+    const purchase = await fetchPurchaseById(pool, purchaseId);
 
-    const result = await pool.query(
-      `
-      SELECT * FROM purchases
-      WHERE id = $1
-        AND (
-          $2 = 'admin'
-          OR buyer_user_id = $3
-          OR creator_user_id = $3
-        )
-      `,
-      [purchaseId, req.user.role, req.user.id]
-    );
-
-    if (result.rows.length === 0) {
+    if (
+      !purchase ||
+      (req.user.role !== "admin" &&
+        purchase.buyer_user_id !== req.user.id &&
+        purchase.creator_user_id !== req.user.id)
+    ) {
       return res.status(404).json({
         message: "Purchase not found"
       });
@@ -127,7 +126,7 @@ export const getPurchaseById = async (req, res) => {
 
     res.status(200).json({
       message: "Purchase fetched successfully",
-      data: normalizeResponseData(result.rows[0])
+      data: normalizeResponseData(purchase)
     });
   } catch (error) {
     res.status(500).json({
@@ -154,7 +153,7 @@ export const updatePurchase = async (req, res) => {
       SET buyer_email = $1, status = COALESCE($2, status)
       WHERE id = $3
         AND ($4 = 'admin' OR buyer_user_id = $5)
-      RETURNING *
+      RETURNING id
       `,
       [buyerEmail, status || null, purchaseId, req.user.role, req.user.id]
     );
@@ -167,7 +166,7 @@ export const updatePurchase = async (req, res) => {
 
     res.status(200).json({
       message: "Purchase updated successfully",
-      data: normalizeResponseData(result.rows[0])
+      data: normalizeResponseData(await fetchPurchaseById(pool, result.rows[0].id))
     });
   } catch (error) {
     res.status(500).json({

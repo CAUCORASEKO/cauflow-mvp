@@ -5,6 +5,11 @@ export interface Asset {
   imageUrl: string | null;
   createdAt: string;
   ownerUserId?: number | null;
+  creator?: AccountSummary | null;
+  monetizationStatus?: PayoutOnboardingStatus;
+  monetizationReady?: boolean;
+  purchaseBlockedReason?: string | null;
+  licenseOptions?: License[];
 }
 
 export interface LicensePolicy {
@@ -45,6 +50,12 @@ export interface Purchase {
   assetId?: number | null;
   packId?: number | null;
   paymentStatus?: PaymentStatus;
+  payment?: PaymentRecord | null;
+  license?: License | null;
+  asset?: Asset | null;
+  pack?: Pack | null;
+  creator?: AccountSummary | null;
+  buyer?: AccountSummary | null;
 }
 
 export type PackStatus = "draft" | "published";
@@ -83,6 +94,10 @@ export interface Pack {
   license: License | null;
   assets?: PackAssetItem[];
   ownerUserId?: number | null;
+  creator?: AccountSummary | null;
+  monetizationStatus?: PayoutOnboardingStatus;
+  monetizationReady?: boolean;
+  purchaseBlockedReason?: string | null;
 }
 
 export type UserRole = "creator" | "buyer" | "admin";
@@ -97,6 +112,15 @@ export type PayoutOnboardingStatus =
   | "disabled";
 
 export type WalletConnectionStatus = "disconnected" | "connected";
+
+export interface AccountSummary {
+  id: number;
+  email: string;
+  publicDisplayName: string | null;
+  organizationName: string | null;
+  studioName: string | null;
+  payoutOnboardingStatus?: PayoutOnboardingStatus;
+}
 
 export interface Account {
   id: number;
@@ -143,6 +167,11 @@ export interface PaymentRecord {
   checkoutUrl?: string;
   createdAt: string;
   updatedAt: string;
+  purchase?: Purchase | null;
+  license?: License | null;
+  asset?: Asset | null;
+  pack?: Pack | null;
+  creator?: AccountSummary | null;
 }
 
 export interface LicenseGrant {
@@ -158,6 +187,12 @@ export interface LicenseGrant {
   expiresAt: string | null;
   createdAt: string;
   updatedAt: string;
+  purchase?: Purchase | null;
+  payment?: PaymentRecord | null;
+  license?: License | null;
+  asset?: Asset | null;
+  pack?: Pack | null;
+  creator?: AccountSummary | null;
 }
 
 export interface ExploreFeed {
