@@ -11,6 +11,7 @@ import {
   X
 } from "lucide-react";
 import { deletePurchase, fetchPurchaseById, updatePurchase } from "@/services/api";
+import { formatLicenseType } from "@/lib/license-taxonomy";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Asset, License, Purchase } from "@/types/api";
 import { ActionFeedback } from "@/components/dashboard/action-feedback";
@@ -301,7 +302,9 @@ export function PurchaseDetailDrawer({
                         Linked license
                       </p>
                       <p className="mt-2 text-sm text-white">
-                        {linkedLicense ? `${linkedLicense.type} · #${linkedLicense.id}` : "N/A"}
+                        {linkedLicense
+                          ? `${formatLicenseType(linkedLicense.type)} · #${linkedLicense.id}`
+                          : "N/A"}
                       </p>
                     </div>
                     <div>
@@ -375,7 +378,9 @@ export function PurchaseDetailDrawer({
                   <p className="text-sm leading-6 text-slate-300">
                     This purchase belongs to{" "}
                     <span className="font-medium text-white">
-                      {linkedLicense ? `${linkedLicense.type} · #${linkedLicense.id}` : "an unavailable license"}
+                      {linkedLicense
+                        ? `${formatLicenseType(linkedLicense.type)} · #${linkedLicense.id}`
+                        : "an unavailable license"}
                     </span>
                     {linkedAsset ? (
                       <>

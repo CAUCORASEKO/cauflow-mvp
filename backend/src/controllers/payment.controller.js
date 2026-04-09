@@ -353,15 +353,16 @@ export const completeCheckoutSession = async (req, res) => {
     await client.query(
       `
       UPDATE payment_records
-      SET status = $1,
+      SET status = $1::varchar,
           updated_at = CURRENT_TIMESTAMP,
           receipt_url = CASE
-            WHEN $1 = 'paid' THEN CONCAT('/receipts/', provider_session_id)
+            WHEN $3::boolean THEN CONCAT('/receipts/', provider_session_id)
             ELSE receipt_url
           END
-      WHERE id = $2
+      WHERE id = $2::integer
+      RETURNING *
       `,
-      [status, paymentRecordId]
+      [status, paymentRecordId, status === "paid"]
     );
 
     let purchase = paymentRecord.purchase_id
@@ -376,8 +377,8 @@ export const completeCheckoutSession = async (req, res) => {
           UPDATE purchases
           SET status = 'completed',
               payment_status = 'paid',
-              buyer_email = $1
-          WHERE id = $2
+              buyer_email = $1::varchar
+          WHERE id = $2::integer
           RETURNING *
           `,
           [req.user.email, purchase.id]
@@ -415,66 +416,50 @@ export const completeCheckoutSession = async (req, res) => {
         await client.query(
           `
           UPDATE payment_records
-          SET purchase_id = $1,
+          SET purchase_id = $1::integer,
               updated_at = CURRENT_TIMESTAMP
-          WHERE id = $2
+          WHERE id = $2::integer
           `,
           [purchase.id, paymentRecordId]
         );
       }
 
-      const existingGrantResult = await client.query(
+      const grantResult = await client.query(
         `
-        SELECT *
-        FROM license_grants
-        WHERE purchase_id = $1
-        LIMIT 1
+        INSERT INTO license_grants (
+          purchase_id,
+          buyer_user_id,
+          creator_user_id,
+          license_id,
+          asset_id,
+          pack_id,
+          status,
+          download_access
+        )
+        VALUES ($1::integer, $2::integer, $3::integer, $4::integer, $5::integer, $6::integer, 'active', true)
+        ON CONFLICT (purchase_id)
+        DO UPDATE
+        SET buyer_user_id = EXCLUDED.buyer_user_id,
+            creator_user_id = EXCLUDED.creator_user_id,
+            license_id = EXCLUDED.license_id,
+            asset_id = EXCLUDED.asset_id,
+            pack_id = EXCLUDED.pack_id,
+            status = 'active',
+            download_access = true,
+            updated_at = CURRENT_TIMESTAMP
+        RETURNING *
         `,
-        [purchase.id]
+        [
+          purchase.id,
+          req.user.id,
+          paymentRecord.creator_user_id,
+          paymentRecord.license_id,
+          paymentRecord.asset_id,
+          paymentRecord.pack_id
+        ]
       );
 
-      if (existingGrantResult.rows[0]) {
-        const grantResult = await client.query(
-          `
-          UPDATE license_grants
-          SET status = 'active',
-              download_access = true,
-              updated_at = CURRENT_TIMESTAMP
-          WHERE id = $1
-          RETURNING *
-          `,
-          [existingGrantResult.rows[0].id]
-        );
-
-        grantedLicense = grantResult.rows[0];
-      } else {
-        const grantResult = await client.query(
-          `
-          INSERT INTO license_grants (
-            purchase_id,
-            buyer_user_id,
-            creator_user_id,
-            license_id,
-            asset_id,
-            pack_id,
-            status,
-            download_access
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, 'active', true)
-          RETURNING *
-          `,
-          [
-            purchase.id,
-            req.user.id,
-            paymentRecord.creator_user_id,
-            paymentRecord.license_id,
-            paymentRecord.asset_id,
-            paymentRecord.pack_id
-          ]
-        );
-
-        grantedLicense = grantResult.rows[0];
-      }
+      grantedLicense = grantResult.rows[0] || null;
     } else {
       const purchaseStatus =
         status === "canceled"
@@ -489,9 +474,9 @@ export const completeCheckoutSession = async (req, res) => {
         const purchaseResult = await client.query(
           `
           UPDATE purchases
-          SET status = $1,
-              payment_status = $2
-          WHERE id = $3
+          SET status = $1::varchar,
+              payment_status = $2::varchar
+          WHERE id = $3::integer
           RETURNING *
           `,
           [purchaseStatus, status, paymentRecord.purchase_id]
@@ -507,7 +492,7 @@ export const completeCheckoutSession = async (req, res) => {
           SET status = 'revoked',
               download_access = false,
               updated_at = CURRENT_TIMESTAMP
-          WHERE purchase_id = $1
+          WHERE purchase_id = $1::integer
           RETURNING *
           `,
           [paymentRecord.purchase_id]

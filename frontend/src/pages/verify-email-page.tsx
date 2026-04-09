@@ -14,6 +14,13 @@ type VerifyLocationState = {
   reason?: string;
 };
 
+type VerificationResolution =
+  | { state: "success"; message: string }
+  | { state: "error"; message: string };
+
+const verificationRequestCache = new Map<string, Promise<VerificationResolution>>();
+const verificationResultCache = new Map<string, VerificationResolution>();
+
 export function VerifyEmailPage() {
   const { user, verifyEmail, resendVerificationEmail } = useAuth();
   const [searchParams] = useSearchParams();
@@ -41,32 +48,47 @@ export function VerifyEmailPage() {
       setVerifyMessage(null);
 
       try {
-        await verifyEmail(token);
+        let request = verificationRequestCache.get(token);
+
+        if (!request) {
+          request = (async () => {
+            try {
+              await verifyEmail(token);
+              const resolution: VerificationResolution = {
+                state: "success",
+                message: "Your account is verified. You can now sign in."
+              };
+              verificationResultCache.set(token, resolution);
+              return resolution;
+            } catch (submissionError) {
+              const resolution: VerificationResolution = {
+                state: "error",
+                message:
+                  submissionError instanceof ApiError &&
+                  submissionError.code === "INVALID_VERIFICATION_TOKEN"
+                    ? "This verification link is invalid or has expired."
+                    : submissionError instanceof Error
+                      ? submissionError.message
+                      : "Unable to verify email"
+              };
+              verificationResultCache.set(token, resolution);
+              return resolution;
+            } finally {
+              verificationRequestCache.delete(token);
+            }
+          })();
+
+          verificationRequestCache.set(token, request);
+        }
+
+        const resolution = verificationResultCache.get(token) || (await request);
 
         if (!active) {
           return;
         }
 
-        setVerifyState("success");
-        setVerifyMessage("Your account is verified. You can now sign in.");
-      } catch (submissionError) {
-        if (!active) {
-          return;
-        }
-
-        setVerifyState("error");
-        if (
-          submissionError instanceof ApiError &&
-          submissionError.code === "INVALID_VERIFICATION_TOKEN"
-        ) {
-          setVerifyMessage("This verification link is invalid or has expired.");
-        } else {
-          setVerifyMessage(
-            submissionError instanceof Error
-              ? submissionError.message
-              : "Unable to verify email"
-          );
-        }
+        setVerifyState(resolution.state);
+        setVerifyMessage(resolution.message);
       } finally {
         if (active) {
           setVerifying(false);

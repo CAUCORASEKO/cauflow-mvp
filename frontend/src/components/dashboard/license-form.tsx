@@ -8,6 +8,7 @@ import {
 import { createLicense } from "@/services/api";
 import { ActionFeedback } from "@/components/dashboard/action-feedback";
 import { FormActionFooter } from "@/components/dashboard/form-action-footer";
+import { LicenseCommercialFields } from "@/components/dashboard/license-commercial-fields";
 import { FormSection } from "@/components/dashboard/form-section";
 import { LicensePolicyBuilder } from "@/components/dashboard/license-policy-builder";
 import { PolicySummaryCard } from "@/components/dashboard/policy-summary-card";
@@ -24,9 +25,9 @@ export function LicenseForm({
   onCreated: (license: License) => void | Promise<void>;
 }) {
   const [assetId, setAssetId] = useState("");
-  const [type, setType] = useState("standard");
+  const [type, setType] = useState("Standard");
   const [price, setPrice] = useState("");
-  const [usage, setUsage] = useState("web");
+  const [usage, setUsage] = useState("Web");
   const [policyEnabled, setPolicyEnabled] = useState(true);
   const [policy, setPolicy] = useState<LicensePolicyInput>(DEFAULT_LICENSE_POLICY);
   const [submitting, setSubmitting] = useState(false);
@@ -58,9 +59,9 @@ export function LicenseForm({
         policy: policyEnabled ? policy : undefined
       });
       setAssetId("");
-      setType("standard");
+      setType("Standard");
       setPrice("");
-      setUsage("web");
+      setUsage("Web");
       setPolicyEnabled(true);
       setPolicy(DEFAULT_LICENSE_POLICY);
       setFeedback("License created successfully.");
@@ -88,7 +89,7 @@ export function LicenseForm({
           </p>
           <h3 className="mt-2 font-display text-2xl text-white">Define license</h3>
           <p className="mt-2 text-sm leading-6 text-slate-300">
-            Turn uploaded IP into a monetization unit with explicit usage and price.
+            Turn uploaded IP into a monetization unit with clear buyer-facing packaging, usage, and price.
           </p>
         </div>
       </div>
@@ -98,7 +99,7 @@ export function LicenseForm({
           step="01"
           eyebrow="Source asset"
           title="Anchor the license to an inventory record"
-          description="Choose the asset, then define the commercial package buyers will purchase."
+          description="Choose the asset, then define the commercial package buyers will recognize and purchase."
         >
           <div className="mt-4 space-y-4">
             <div className="space-y-2">
@@ -117,28 +118,12 @@ export function LicenseForm({
               </Select>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-100">
-                  License type
-                </label>
-                <Input
-                  placeholder="Standard"
-                  value={type}
-                  onChange={(event) => setType(event.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-100">Scope / usage</label>
-                <Input
-                  placeholder="Web"
-                  value={usage}
-                  onChange={(event) => setUsage(event.target.value)}
-                  required
-                />
-              </div>
-            </div>
+            <LicenseCommercialFields
+              type={type}
+              usage={usage}
+              onTypeChange={setType}
+              onUsageChange={setUsage}
+            />
 
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-100">Price</label>

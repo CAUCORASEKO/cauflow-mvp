@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { formatLicenseType } from "@/lib/license-taxonomy";
 import { formatCurrency } from "@/lib/utils";
 import { createPack } from "@/services/api";
 import type { Asset, License, Pack, PackCategory, PackStatus } from "@/types/api";
@@ -251,7 +252,7 @@ export function PackForm({
                 <option value="">No base license</option>
                 {licenses.map((license) => (
                   <option key={license.id} value={license.id}>
-                    {license.type} · #{license.id}
+                    {formatLicenseType(license.type)} · #{license.id}
                   </option>
                 ))}
               </Select>

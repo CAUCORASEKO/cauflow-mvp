@@ -4,6 +4,7 @@ import { CreditCard, ShieldCheck } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { formatLicenseType, formatLicenseUsage } from "@/lib/license-taxonomy";
 import { buyerNav } from "@/lib/platform-nav";
 import { formatCurrency, formatDate, humanizeLabel } from "@/lib/utils";
 import { fetchPurchases } from "@/services/api";
@@ -50,7 +51,9 @@ export function PurchasesPage() {
                   <h2 className="mt-3 font-display text-3xl text-white">{getOfferingTitle(purchase)}</h2>
                   <p className="mt-3 text-sm leading-7 text-slate-300">
                     {purchase.license
-                      ? `${purchase.license.type} · ${purchase.license.usage}`
+                      ? `${formatLicenseType(purchase.license.type)} · ${formatLicenseUsage(
+                          purchase.license.usage
+                        )}`
                       : `License #${purchase.licenseId}`}
                   </p>
                 </div>
@@ -70,7 +73,11 @@ export function PurchasesPage() {
                 </div>
                 <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Selected license</p>
-                  <p className="mt-2 text-white">{purchase.license?.type || `#${purchase.licenseId}`}</p>
+                  <p className="mt-2 text-white">
+                    {purchase.license
+                      ? formatLicenseType(purchase.license.type)
+                      : `#${purchase.licenseId}`}
+                  </p>
                 </div>
                 <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Payment state</p>

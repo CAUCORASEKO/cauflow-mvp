@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { CreditCard, LoaderCircle } from "lucide-react";
 import type { License } from "@/types/api";
+import { formatLicenseType } from "@/lib/license-taxonomy";
 import { createPurchase } from "@/services/api";
 import { formatCurrency } from "@/lib/utils";
 import { ActionFeedback } from "@/components/dashboard/action-feedback";
@@ -88,7 +89,7 @@ export function PurchaseForm({
             <option value="">Select a license</option>
             {licenses.map((license) => (
               <option key={license.id} value={license.id}>
-                #{license.id} {license.type} {formatCurrency(Number(license.price))}
+                #{license.id} {formatLicenseType(license.type)} {formatCurrency(Number(license.price))}
               </option>
             ))}
           </Select>

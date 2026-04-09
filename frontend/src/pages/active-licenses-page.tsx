@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Download, ShieldCheck } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Card } from "@/components/ui/card";
+import { formatLicenseType, formatLicenseUsage } from "@/lib/license-taxonomy";
 import { buyerNav } from "@/lib/platform-nav";
 import { formatCurrency, formatDate, humanizeLabel } from "@/lib/utils";
 import { fetchEntitlements } from "@/services/api";
@@ -38,7 +39,11 @@ export function ActiveLicensesPage() {
                   </div>
                   <h2 className="mt-3 font-display text-3xl text-white">{getGrantTitle(grant)}</h2>
                   <p className="mt-3 text-sm leading-7 text-slate-300">
-                    {grant.license ? `${grant.license.type} · ${grant.license.usage}` : `License #${grant.licenseId}`}
+                    {grant.license
+                      ? `${formatLicenseType(grant.license.type)} · ${formatLicenseUsage(
+                          grant.license.usage
+                        )}`
+                      : `License #${grant.licenseId}`}
                   </p>
                 </div>
 

@@ -116,7 +116,9 @@ export const buildPurchaseSelect = (whereClause = "TRUE") => `
 `;
 
 export const fetchPurchaseById = async (db, purchaseId) => {
-  const result = await db.query(`${buildPurchaseSelect("p.id = $1")} LIMIT 1`, [purchaseId]);
+  const result = await db.query(`${buildPurchaseSelect("p.id = $1::integer")} LIMIT 1`, [
+    purchaseId
+  ]);
   return result.rows[0] || null;
 };
 
@@ -289,9 +291,10 @@ export const buildCheckoutSessionSelect = (whereClause = "pr.id = $1") => `
 `;
 
 export const fetchCheckoutSessionById = async (db, paymentRecordId) => {
-  const result = await db.query(`${buildCheckoutSessionSelect("pr.id = $1")} LIMIT 1`, [
-    paymentRecordId
-  ]);
+  const result = await db.query(
+    `${buildCheckoutSessionSelect("pr.id = $1::integer")} LIMIT 1`,
+    [paymentRecordId]
+  );
 
   return result.rows[0] || null;
 };

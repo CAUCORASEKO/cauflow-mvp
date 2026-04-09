@@ -1,5 +1,6 @@
 import { Eye, PencilLine, Trash2 } from "lucide-react";
 import type { Asset, License, Purchase } from "@/types/api";
+import { formatLicenseType, formatLicenseUsage } from "@/lib/license-taxonomy";
 import { getLicensePolicyBadges, getLicensePolicyInput } from "@/lib/license-policy";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
@@ -72,7 +73,7 @@ export function LicenseList({
                   </span>
                 </div>
                 <p className="mt-2 text-sm text-slate-400">
-                  {license.type} license for {license.usage}
+                  {formatLicenseType(license.type)} license for {formatLicenseUsage(license.usage)}
                 </p>
                 {policyBadges.length > 0 ? (
                   <div className="mt-3 flex flex-wrap gap-2">

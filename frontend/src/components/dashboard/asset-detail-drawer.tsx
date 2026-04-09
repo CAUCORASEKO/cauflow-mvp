@@ -10,6 +10,7 @@ import {
   X
 } from "lucide-react";
 import { fetchAssetById, getAssetImageUrl, updateAsset } from "@/services/api";
+import { formatLicenseType, formatLicenseUsage } from "@/lib/license-taxonomy";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Asset, License, Purchase } from "@/types/api";
 import { ActionFeedback } from "@/components/dashboard/action-feedback";
@@ -485,13 +486,15 @@ export function AssetDetailDrawer({
                           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                               <div className="flex items-center gap-2">
-                                <p className="font-medium text-white">{license.type}</p>
+                                <p className="font-medium text-white">
+                                  {formatLicenseType(license.type)}
+                                </p>
                                 <span className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-400">
                                   #{license.id}
                                 </span>
                               </div>
                               <p className="mt-2 text-sm text-slate-400">
-                                {license.usage} usage
+                                {formatLicenseUsage(license.usage)} usage
                               </p>
                             </div>
                             <div className="text-left sm:text-right">

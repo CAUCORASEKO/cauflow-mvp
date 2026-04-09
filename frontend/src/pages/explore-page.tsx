@@ -7,6 +7,7 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/contexts/auth-context";
+import { formatLicenseType, formatLicenseUsage } from "@/lib/license-taxonomy";
 import { buyerNav } from "@/lib/platform-nav";
 import { formatCurrency, humanizeLabel } from "@/lib/utils";
 import {
@@ -91,7 +92,7 @@ function ExploreAssetCard({
               {!asset.licenseOptions?.length ? <option value="">No license options</option> : null}
               {asset.licenseOptions?.map((license) => (
                 <option key={license.id} value={license.id}>
-                  {license.type} · {formatCurrency(Number(license.price))}
+                  {formatLicenseType(license.type)} · {formatCurrency(Number(license.price))}
                 </option>
               ))}
             </select>
@@ -99,11 +100,15 @@ function ExploreAssetCard({
           <div className="grid gap-2 text-sm text-slate-300">
             <div className="flex items-center justify-between gap-4">
               <span className="text-slate-500">Selected right</span>
-              <span className="text-white">{selectedLicense?.type || "Not available"}</span>
+              <span className="text-white">
+                {selectedLicense ? formatLicenseType(selectedLicense.type) : "Not available"}
+              </span>
             </div>
             <div className="flex items-center justify-between gap-4">
               <span className="text-slate-500">Usage</span>
-              <span className="text-white">{selectedLicense?.usage || "Unavailable"}</span>
+              <span className="text-white">
+                {selectedLicense ? formatLicenseUsage(selectedLicense.usage) : "Unavailable"}
+              </span>
             </div>
             <div className="flex items-center justify-between gap-4">
               <span className="text-slate-500">Price</span>
@@ -189,8 +194,14 @@ function ExplorePackCard({
         <div className="grid gap-3 rounded-[24px] border border-white/10 bg-black/20 p-4 md:grid-cols-2">
           <div className="space-y-2">
             <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Included offer</p>
-            <p className="text-base font-semibold text-white">{pack.license?.type || "No pack license"}</p>
-            <p className="text-sm text-slate-300">{pack.license?.usage || "Attach a pack license to sell this bundle."}</p>
+            <p className="text-base font-semibold text-white">
+              {pack.license ? formatLicenseType(pack.license.type) : "No pack license"}
+            </p>
+            <p className="text-sm text-slate-300">
+              {pack.license
+                ? formatLicenseUsage(pack.license.usage)
+                : "Attach a pack license to sell this bundle."}
+            </p>
           </div>
           <div className="grid gap-2 text-sm text-slate-300">
             <div className="flex items-center justify-between gap-4">

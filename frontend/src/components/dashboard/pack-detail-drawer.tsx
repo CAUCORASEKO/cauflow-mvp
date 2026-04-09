@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { formatLicenseType } from "@/lib/license-taxonomy";
 import { getAssetImageUrl, getPackById, updatePack } from "@/services/api";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Asset, License, Pack, PackCategory, PackStatus } from "@/types/api";
@@ -359,7 +360,7 @@ export function PackDetailDrawer({
                 />
                 <MetricCard
                   label="Base license"
-                  value={pack.license?.type || "None"}
+                  value={pack.license ? formatLicenseType(pack.license.type) : "None"}
                 />
                 <MetricCard
                   label="Created"
@@ -472,7 +473,7 @@ export function PackDetailDrawer({
                           <option value="">No base license</option>
                           {licenses.map((license) => (
                             <option key={license.id} value={license.id}>
-                              {license.type} · #{license.id}
+                              {formatLicenseType(license.type)} · #{license.id}
                             </option>
                           ))}
                         </Select>

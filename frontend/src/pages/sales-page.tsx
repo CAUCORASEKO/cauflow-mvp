@@ -3,6 +3,7 @@ import { CreditCard, Receipt, ShieldCheck, Wallet } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { Card } from "@/components/ui/card";
+import { formatLicenseType, formatLicenseUsage } from "@/lib/license-taxonomy";
 import { creatorNav } from "@/lib/platform-nav";
 import { formatCurrency, formatDate, humanizeLabel } from "@/lib/utils";
 import { fetchPurchases } from "@/services/api";
@@ -117,7 +118,9 @@ export function SalesPage() {
                   <h2 className="mt-3 font-display text-3xl text-white">{getSaleTitle(sale)}</h2>
                   <p className="mt-3 text-sm leading-7 text-slate-300">
                     {sale.license
-                      ? `${sale.license.type} · ${sale.license.usage}`
+                      ? `${formatLicenseType(sale.license.type)} · ${formatLicenseUsage(
+                          sale.license.usage
+                        )}`
                       : `License #${sale.licenseId}`}
                   </p>
                 </div>

@@ -1,5 +1,6 @@
 import { Eye, PencilLine, Trash2 } from "lucide-react";
 import type { Asset, License, Purchase } from "@/types/api";
+import { formatLicenseType } from "@/lib/license-taxonomy";
 import { formatCurrency, formatDate, humanizeLabel } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 
@@ -55,7 +56,7 @@ export function PurchaseList({
                 <div>
                   <p className="font-semibold text-white">{purchase.buyerEmail}</p>
                   <p className="mt-2 text-sm text-slate-400">
-                    License #{purchase.licenseId} {license ? `· ${license.type}` : ""}
+                    License #{purchase.licenseId} {license ? `· ${formatLicenseType(license.type)}` : ""}
                   </p>
                   <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">
                     {asset ? `${asset.title} · Asset #${asset.id}` : "Asset unavailable"}

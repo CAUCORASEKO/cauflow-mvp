@@ -17,10 +17,12 @@ import { fetchLicenseById, updateLicense } from "@/services/api";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Asset, License, Purchase } from "@/types/api";
 import { ActionFeedback } from "@/components/dashboard/action-feedback";
+import { LicenseCommercialFields } from "@/components/dashboard/license-commercial-fields";
 import { LicensePolicyBuilder } from "@/components/dashboard/license-policy-builder";
 import { PolicySummaryCard } from "@/components/dashboard/policy-summary-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { formatLicenseType, formatLicenseUsage } from "@/lib/license-taxonomy";
 
 export function LicenseDetailDrawer({
   licenseId,
@@ -198,7 +200,11 @@ export function LicenseDetailDrawer({
               License detail
             </p>
             <h3 className="mt-2 font-display text-2xl text-white">
-              {loading ? "Loading license..." : license?.type || "License detail"}
+              {loading
+                ? "Loading license..."
+                : license
+                  ? formatLicenseType(license.type)
+                  : "License detail"}
             </h3>
           </div>
           <button
@@ -314,13 +320,17 @@ export function LicenseDetailDrawer({
                       <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
                         Type
                       </p>
-                      <p className="mt-2 text-sm text-white">{license.type}</p>
+                      <p className="mt-2 text-sm text-white">
+                        {formatLicenseType(license.type)}
+                      </p>
                     </div>
                     <div>
                       <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
                         Usage
                       </p>
-                      <p className="mt-2 text-sm text-white">{license.usage}</p>
+                      <p className="mt-2 text-sm text-white">
+                        {formatLicenseUsage(license.usage)}
+                      </p>
                     </div>
                     <div>
                       <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
@@ -339,24 +349,12 @@ export function LicenseDetailDrawer({
                   </div>
                 ) : (
                   <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-slate-200">
-                        License type
-                      </label>
-                      <Input
-                        value={type}
-                        onChange={(event) => setType(event.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-slate-200">Usage</label>
-                      <Input
-                        value={usage}
-                        onChange={(event) => setUsage(event.target.value)}
-                        required
-                      />
-                    </div>
+                    <LicenseCommercialFields
+                      type={type}
+                      usage={usage}
+                      onTypeChange={setType}
+                      onUsageChange={setUsage}
+                    />
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-slate-200">Price</label>
                       <Input

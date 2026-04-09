@@ -5,6 +5,7 @@ import { ActionFeedback } from "@/components/dashboard/action-feedback";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { formatLicenseType, formatLicenseUsage } from "@/lib/license-taxonomy";
 import { buyerNav } from "@/lib/platform-nav";
 import { formatCurrency, formatDate, humanizeLabel } from "@/lib/utils";
 import { completeCheckoutSession, fetchCheckoutSession } from "@/services/api";
@@ -102,8 +103,16 @@ export function CheckoutPage() {
           </div>
           <Card className="surface-highlight min-w-[280px] p-5">
             <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Selected license</p>
-            <p className="mt-3 font-display text-3xl text-white">{checkoutSession?.license?.type || "Loading"}</p>
-            <p className="mt-2 text-sm text-slate-300">{checkoutSession?.license?.usage || "Awaiting checkout data"}</p>
+            <p className="mt-3 font-display text-3xl text-white">
+              {checkoutSession?.license
+                ? formatLicenseType(checkoutSession.license.type)
+                : "Loading"}
+            </p>
+            <p className="mt-2 text-sm text-slate-300">
+              {checkoutSession?.license
+                ? formatLicenseUsage(checkoutSession.license.usage)
+                : "Awaiting checkout data"}
+            </p>
             <p className="mt-4 text-sm text-slate-400">
               {checkoutSession ? formatCurrency(Number(checkoutSession.amount)) : "Loading amount"}
             </p>

@@ -1,5 +1,6 @@
 import { Eye, ImageIcon, PencilLine, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { formatLicenseType } from "@/lib/license-taxonomy";
 import { getAssetImageUrl } from "@/services/api";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { Pack } from "@/types/api";
@@ -84,7 +85,11 @@ export function PackList({
                 <div className="mt-4 flex flex-wrap items-center gap-4 text-xs uppercase tracking-[0.18em] text-slate-300/75">
                   <span>{pack.assetCount} assets</span>
                   <span>{formatCurrency(Number(pack.price))}</span>
-                  <span>{pack.license ? `${pack.license.type} license` : "No base license"}</span>
+                  <span>
+                    {pack.license
+                      ? `${formatLicenseType(pack.license.type)} license`
+                      : "No base license"}
+                  </span>
                   <span>Updated {formatDate(pack.updatedAt)}</span>
                 </div>
               </button>
