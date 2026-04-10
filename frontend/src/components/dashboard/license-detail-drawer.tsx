@@ -23,6 +23,7 @@ import { PolicySummaryCard } from "@/components/dashboard/policy-summary-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatLicenseType, formatLicenseUsage } from "@/lib/license-taxonomy";
+import { formatVisualAssetType } from "@/lib/visual-taxonomy";
 
 export function LicenseDetailDrawer({
   licenseId,
@@ -263,10 +264,10 @@ export function LicenseDetailDrawer({
                 </div>
                 <div className="rounded-[22px] border border-white/8 bg-white/[0.025] p-4">
                   <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
-                    Asset
+                    Visual category
                   </p>
                   <p className="mt-2 text-sm font-medium text-white">
-                    {linkedAsset ? linkedAsset.title : `Asset #${license.assetId}`}
+                    {linkedAsset ? formatVisualAssetType(linkedAsset.visualType) : "Photography"}
                   </p>
                 </div>
                 <div className="rounded-[22px] border border-white/8 bg-white/[0.025] p-4">
@@ -338,6 +339,14 @@ export function LicenseDetailDrawer({
                       </p>
                       <p className="mt-2 font-display text-2xl text-white">
                         {formatCurrency(Number(license.price))}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                        Linked asset
+                      </p>
+                      <p className="mt-2 text-sm text-white">
+                        {linkedAsset ? linkedAsset.title : `Asset #${license.assetId}`}
                       </p>
                     </div>
                     <div>

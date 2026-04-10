@@ -18,6 +18,7 @@ export const getExploreFeed = async (req, res) => {
           a.title,
           a.description,
           a.image_url,
+          a.visual_type,
           a.created_at,
           a.owner_user_id,
           row_to_json(creator_summary) AS creator,
@@ -110,6 +111,7 @@ export const getExploreFeed = async (req, res) => {
             a.title,
             a.description,
             a.image_url,
+            a.visual_type,
             a.created_at,
             a.owner_user_id
           FROM assets a

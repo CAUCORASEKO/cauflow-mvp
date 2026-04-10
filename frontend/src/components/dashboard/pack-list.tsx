@@ -4,6 +4,7 @@ import { formatLicenseType } from "@/lib/license-taxonomy";
 import { getAssetImageUrl } from "@/services/api";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { Pack } from "@/types/api";
+import { formatPackCategory, formatVisualAssetType } from "@/lib/visual-taxonomy";
 
 const statusClassName: Record<Pack["status"], string> = {
   draft: "border-white/10 bg-white/[0.04] text-slate-300",
@@ -74,8 +75,13 @@ export function PackList({
                     {pack.status}
                   </span>
                   <span className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-300/80">
-                    {pack.category}
+                    {formatPackCategory(pack.category)}
                   </span>
+                  {pack.coverAsset?.visualType ? (
+                    <span className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-300/80">
+                      {formatVisualAssetType(pack.coverAsset.visualType)}
+                    </span>
+                  ) : null}
                 </div>
 
                 <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-300">

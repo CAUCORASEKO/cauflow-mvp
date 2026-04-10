@@ -4,6 +4,13 @@ import { buildPackDeleteBlockMessage } from "../utils/delete-constraints.js";
 
 const PACK_STATUSES = new Set(["draft", "published"]);
 const PACK_CATEGORIES = new Set([
+  "photography",
+  "illustration",
+  "concept_art",
+  "character_design",
+  "environment",
+  "brand_visual",
+  "mixed_visuals",
   "visual",
   "brand",
   "character",
@@ -65,7 +72,7 @@ const validatePackInput = async (db, input, user) => {
 
   if (!PACK_CATEGORIES.has(category)) {
     throw new Error(
-      "category must be one of: visual, brand, character, concept, dataset, prompt, mixed"
+      "category must be one of the supported visual pack categories"
     );
   }
 
@@ -177,6 +184,7 @@ const fetchPackById = async (db, packId) => {
             a.title,
             a.description,
             a.image_url,
+            a.visual_type,
             a.created_at
           FROM assets a
           WHERE a.id = p.cover_asset_id
@@ -230,6 +238,7 @@ const fetchPackById = async (db, packId) => {
         a.title,
         a.description,
         a.image_url,
+        a.visual_type,
         a.created_at
       FROM assets a
       WHERE a.id = pa.asset_id
@@ -341,6 +350,7 @@ export const getPacks = async (req, res) => {
               a.title,
               a.description,
               a.image_url,
+              a.visual_type,
               a.created_at
             FROM assets a
             WHERE a.id = p.cover_asset_id

@@ -10,6 +10,7 @@ import { buyerNav } from "@/lib/platform-nav";
 import { formatCurrency, formatDate, humanizeLabel } from "@/lib/utils";
 import { completeCheckoutSession, fetchCheckoutSession } from "@/services/api";
 import type { PaymentRecord, PaymentStatus } from "@/types/api";
+import { formatPackCategory, formatVisualAssetType } from "@/lib/visual-taxonomy";
 
 const paymentCopy: Record<
   PaymentStatus,
@@ -113,6 +114,13 @@ export function CheckoutPage() {
                 ? formatLicenseUsage(checkoutSession.license.usage)
                 : "Awaiting checkout data"}
             </p>
+            <p className="mt-2 text-sm text-slate-400">
+              {checkoutSession?.pack
+                ? formatPackCategory(checkoutSession.pack.category)
+                : checkoutSession?.asset
+                  ? formatVisualAssetType(checkoutSession.asset.visualType)
+                  : "Visual asset"}
+            </p>
             <p className="mt-4 text-sm text-slate-400">
               {checkoutSession ? formatCurrency(Number(checkoutSession.amount)) : "Loading amount"}
             </p>
@@ -149,6 +157,13 @@ export function CheckoutPage() {
                   <p className="mt-2 text-lg text-white">{getOfferingLabel(checkoutSession)}</p>
                   <p className="mt-2 text-sm text-slate-300">
                     {checkoutSession?.pack ? "Pack license" : "Asset license"}
+                  </p>
+                  <p className="mt-2 text-sm text-slate-400">
+                    {checkoutSession?.pack
+                      ? formatPackCategory(checkoutSession.pack.category)
+                      : checkoutSession?.asset
+                        ? formatVisualAssetType(checkoutSession.asset.visualType)
+                        : "Visual asset"}
                   </p>
                 </div>
                 <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">

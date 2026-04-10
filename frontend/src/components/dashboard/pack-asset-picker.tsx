@@ -2,6 +2,7 @@ import { Check, ImageIcon, Star } from "lucide-react";
 import { getAssetImageUrl } from "@/services/api";
 import type { Asset } from "@/types/api";
 import { cn } from "@/lib/utils";
+import { formatVisualAssetType } from "@/lib/visual-taxonomy";
 
 export function PackAssetPicker({
   assets,
@@ -105,6 +106,9 @@ export function PackAssetPicker({
                   </span>
                   <span className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-300/80">
                     Asset #{asset.id}
+                  </span>
+                  <span className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-300/80">
+                    {formatVisualAssetType(asset.visualType)}
                   </span>
                   {isCover ? (
                     <span className="rounded-full border border-amber-300/20 bg-amber-300/[0.1] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100">

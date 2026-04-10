@@ -16,7 +16,9 @@ import type { Asset, License, Purchase } from "@/types/api";
 import { ActionFeedback } from "@/components/dashboard/action-feedback";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { formatVisualAssetType, visualAssetTypeOptions } from "@/lib/visual-taxonomy";
 
 export function AssetDetailDrawer({
   assetId,
@@ -41,6 +43,7 @@ export function AssetDetailDrawer({
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [visualType, setVisualType] = useState<Asset["visualType"]>("photography");
   const [replacementImage, setReplacementImage] = useState<File | null>(null);
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -87,6 +90,7 @@ export function AssetDetailDrawer({
         setAsset(nextAsset);
         setTitle(nextAsset.title);
         setDescription(nextAsset.description || "");
+        setVisualType(nextAsset.visualType);
       } catch (loadError) {
         if (cancelled) {
           return;
@@ -171,6 +175,7 @@ export function AssetDetailDrawer({
           setAsset(nextAsset);
           setTitle(nextAsset.title);
           setDescription(nextAsset.description || "");
+          setVisualType(nextAsset.visualType);
         })
         .catch((loadError) => {
           setAsset(null);
@@ -198,11 +203,13 @@ export function AssetDetailDrawer({
       const updatedAsset = await updateAsset(asset.id, {
         title,
         description,
+        visualType,
         image: replacementImage
       });
       setAsset(updatedAsset);
       setTitle(updatedAsset.title);
       setDescription(updatedAsset.description || "");
+      setVisualType(updatedAsset.visualType);
       setReplacementImage(null);
       setIsEditing(false);
       setSaveFeedback("Asset metadata updated successfully.");
@@ -306,7 +313,7 @@ export function AssetDetailDrawer({
                 )}
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-4">
+              <div className="grid gap-3 sm:grid-cols-5">
                 <div className="rounded-[22px] border border-white/8 bg-white/[0.025] p-4">
                   <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
                     Asset ID
@@ -319,6 +326,14 @@ export function AssetDetailDrawer({
                   </p>
                   <p className="mt-2 text-sm font-medium text-white">
                     {asset.imageUrl || replacementImage ? "Preview attached" : "Metadata only"}
+                  </p>
+                </div>
+                <div className="rounded-[22px] border border-white/8 bg-white/[0.025] p-4">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                    Visual category
+                  </p>
+                  <p className="mt-2 text-sm font-medium text-white">
+                    {formatVisualAssetType(asset.visualType)}
                   </p>
                 </div>
                 <div className="rounded-[22px] border border-white/8 bg-white/[0.025] p-4">
@@ -354,6 +369,7 @@ export function AssetDetailDrawer({
                         setIsEditing(true);
                         setTitle(asset.title);
                         setDescription(asset.description || "");
+                        setVisualType(asset.visualType);
                         setReplacementImage(null);
                         setSaveError(null);
                       }}
@@ -366,6 +382,14 @@ export function AssetDetailDrawer({
 
                 {!isEditing ? (
                   <div className="mt-4 space-y-4">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                        Visual category
+                      </p>
+                      <p className="mt-2 text-sm text-white">
+                        {formatVisualAssetType(asset.visualType)}
+                      </p>
+                    </div>
                     <div>
                       <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
                         Created
@@ -393,6 +417,28 @@ export function AssetDetailDrawer({
                         placeholder="Asset title"
                         required
                       />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-slate-200">
+                        Visual category
+                      </label>
+                      <Select
+                        value={visualType}
+                        onChange={(event) =>
+                          setVisualType(event.target.value as Asset["visualType"])
+                        }
+                        required
+                      >
+                        {visualAssetTypeOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </Select>
+                      <p className="text-sm leading-6 text-slate-400">
+                        Describe the visual format or creative discipline of this asset.
+                        This appears in marketplace and licensing surfaces.
+                      </p>
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-slate-200">
@@ -451,6 +497,7 @@ export function AssetDetailDrawer({
                           setIsEditing(false);
                           setTitle(asset.title);
                           setDescription(asset.description || "");
+                          setVisualType(asset.visualType);
                           setReplacementImage(null);
                           setSaveError(null);
                         }}

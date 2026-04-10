@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS assets (
   title VARCHAR(255) NOT NULL,
   description TEXT,
   image_url VARCHAR(500),
+  visual_type VARCHAR(50) NOT NULL DEFAULT 'photography',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -74,7 +75,14 @@ ALTER TABLE assets
 ADD COLUMN IF NOT EXISTS image_url VARCHAR(500);
 
 ALTER TABLE assets
+ADD COLUMN IF NOT EXISTS visual_type VARCHAR(50) NOT NULL DEFAULT 'photography';
+
+ALTER TABLE assets
 ADD COLUMN IF NOT EXISTS owner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+
+UPDATE assets
+SET visual_type = 'photography'
+WHERE visual_type IS NULL OR trim(visual_type) = '';
 
 CREATE TABLE IF NOT EXISTS licenses (
   id SERIAL PRIMARY KEY,
@@ -136,6 +144,9 @@ CREATE TABLE IF NOT EXISTS packs (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE packs
+ALTER COLUMN category SET DEFAULT 'mixed_visuals';
 
 ALTER TABLE packs
 ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;

@@ -18,16 +18,11 @@ import { formatLicenseType } from "@/lib/license-taxonomy";
 import { getAssetImageUrl, getPackById, updatePack } from "@/services/api";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Asset, License, Pack, PackCategory, PackStatus } from "@/types/api";
-
-const categoryOptions: PackCategory[] = [
-  "visual",
-  "brand",
-  "character",
-  "concept",
-  "dataset",
-  "prompt",
-  "mixed"
-];
+import {
+  formatPackCategory,
+  formatVisualAssetType,
+  packCategoryOptions as categoryOptions
+} from "@/lib/visual-taxonomy";
 
 const statusOptions: PackStatus[] = ["draft", "published"];
 
@@ -54,7 +49,7 @@ export function PackDetailDrawer({
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState<PackCategory>("visual");
+  const [category, setCategory] = useState<PackCategory>("mixed_visuals");
   const [price, setPrice] = useState("");
   const [status, setStatus] = useState<PackStatus>("draft");
   const [licenseId, setLicenseId] = useState("");
@@ -341,7 +336,7 @@ export function PackDetailDrawer({
                 <div className="p-6">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-400">
-                      {pack.category}
+                      {formatPackCategory(pack.category)}
                     </span>
                     <span className="rounded-full border border-emerald-400/20 bg-emerald-400/[0.1] px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-emerald-100">
                       {pack.status}
@@ -354,6 +349,7 @@ export function PackDetailDrawer({
 
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <MetricCard label="Pack ID" value={`#${pack.id}`} />
+                <MetricCard label="Category" value={formatPackCategory(pack.category)} />
                 <MetricCard
                   label="Price"
                   value={formatCurrency(Number(pack.price))}
@@ -433,11 +429,15 @@ export function PackDetailDrawer({
                           required
                         >
                           {categoryOptions.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
+                            <option key={option.value} value={option.value}>
+                              {option.label}
                             </option>
                           ))}
                         </Select>
+                        <p className="text-sm leading-6 text-slate-400">
+                          Position the pack by the main visual format represented across
+                          the included assets.
+                        </p>
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-slate-200">Status</label>
@@ -575,6 +575,9 @@ export function PackDetailDrawer({
                           <h5 className="font-medium text-white">{item.asset.title}</h5>
                           <span className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-400">
                             #{item.asset.id}
+                          </span>
+                          <span className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-400">
+                            {formatVisualAssetType(item.asset.visualType)}
                           </span>
                           {pack.coverAssetId === item.assetId ? (
                             <span className="rounded-full border border-amber-300/20 bg-amber-300/[0.1] px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-amber-100">

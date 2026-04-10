@@ -9,6 +9,7 @@ import { buyerNav } from "@/lib/platform-nav";
 import { formatCurrency, formatDate, humanizeLabel } from "@/lib/utils";
 import { fetchPurchases } from "@/services/api";
 import type { Purchase } from "@/types/api";
+import { formatPackCategory, formatVisualAssetType } from "@/lib/visual-taxonomy";
 
 const getOfferingTitle = (purchase: Purchase) =>
   purchase.pack?.title || purchase.asset?.title || `License #${purchase.licenseId}`;
@@ -55,6 +56,13 @@ export function PurchasesPage() {
                           purchase.license.usage
                         )}`
                       : `License #${purchase.licenseId}`}
+                  </p>
+                  <p className="mt-2 text-sm text-slate-400">
+                    {purchase.pack
+                      ? formatPackCategory(purchase.pack.category)
+                      : purchase.asset
+                        ? formatVisualAssetType(purchase.asset.visualType)
+                        : "Visual asset"}
                   </p>
                 </div>
 

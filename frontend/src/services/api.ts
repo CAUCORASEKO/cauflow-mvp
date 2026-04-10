@@ -108,11 +108,13 @@ export const fetchAssetById = async (assetId: number) => {
 export const createAsset = async (input: {
   title: string;
   description: string;
+  visualType: Asset["visualType"];
   image?: File | null;
 }) => {
   const formData = new FormData();
   formData.append("title", input.title);
   formData.append("description", input.description);
+  formData.append("visualType", input.visualType);
 
   if (input.image) {
     formData.append("image", input.image);
@@ -141,12 +143,14 @@ export const updateAsset = async (
   input: {
     title: string;
     description: string;
+    visualType: Asset["visualType"];
     image?: File | null;
   }
 ) => {
   const formData = new FormData();
   formData.append("title", input.title);
   formData.append("description", input.description);
+  formData.append("visualType", input.visualType);
 
   if (input.image) {
     formData.append("image", input.image);

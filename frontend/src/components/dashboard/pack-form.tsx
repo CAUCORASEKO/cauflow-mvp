@@ -13,16 +13,10 @@ import { formatLicenseType } from "@/lib/license-taxonomy";
 import { formatCurrency } from "@/lib/utils";
 import { createPack } from "@/services/api";
 import type { Asset, License, Pack, PackCategory, PackStatus } from "@/types/api";
-
-const categoryOptions: PackCategory[] = [
-  "visual",
-  "brand",
-  "character",
-  "concept",
-  "dataset",
-  "prompt",
-  "mixed"
-];
+import {
+  formatPackCategory,
+  packCategoryOptions as categoryOptions
+} from "@/lib/visual-taxonomy";
 
 const statusOptions: PackStatus[] = ["draft", "published"];
 
@@ -37,7 +31,7 @@ export function PackForm({
 }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState<PackCategory>("visual");
+  const [category, setCategory] = useState<PackCategory>("mixed_visuals");
   const [price, setPrice] = useState("");
   const [status, setStatus] = useState<PackStatus>("draft");
   const [licenseId, setLicenseId] = useState("");
@@ -107,7 +101,7 @@ export function PackForm({
   const resetForm = () => {
     setTitle("");
     setDescription("");
-    setCategory("visual");
+    setCategory("mixed_visuals");
     setPrice("");
     setStatus("draft");
     setLicenseId("");
@@ -215,11 +209,15 @@ export function PackForm({
                 required
               >
                 {categoryOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </Select>
+              <p className="text-sm leading-6 text-slate-400">
+                Position the bundle by the dominant visual discipline buyers should
+                expect across the included assets.
+              </p>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-100">Status</label>
@@ -310,6 +308,14 @@ export function PackForm({
               </p>
               <p className="mt-2 text-sm font-semibold text-white">
                 {selectedLicense ? selectedLicense.type : "Not attached"}
+              </p>
+            </div>
+            <div className="rounded-[22px] border border-white/8 bg-black/20 p-4">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300/80">
+                Pack category
+              </p>
+              <p className="mt-2 text-sm font-semibold text-white">
+                {formatPackCategory(category)}
               </p>
             </div>
           </div>

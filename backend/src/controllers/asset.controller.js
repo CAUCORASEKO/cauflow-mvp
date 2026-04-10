@@ -7,6 +7,34 @@ import { buildAssetDeleteBlockMessage } from "../utils/delete-constraints.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const DEFAULT_VISUAL_TYPE = "photography";
+const VISUAL_TYPES = new Set([
+  "photography",
+  "illustration",
+  "concept_art",
+  "character_design",
+  "environment",
+  "brand_visual"
+]);
+
+const normalizeVisualType = (value, fallback = DEFAULT_VISUAL_TYPE) => {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return fallback;
+  }
+
+  const normalizedValue = value
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+
+  if (!VISUAL_TYPES.has(normalizedValue)) {
+    throw new Error(
+      "visualType must be one of: photography, illustration, concept_art, character_design, environment, brand_visual"
+    );
+  }
+
+  return normalizedValue;
+};
 
 const removeUploadedFile = async (filePath) => {
   if (!filePath) {
@@ -26,7 +54,7 @@ export const uploadAsset = async (req, res) => {
   const uploadedFilePath = req.file?.path;
 
   try {
-    const { title, description } = req.body;
+    const { title, description, visualType } = req.body;
     const normalizedTitle = title?.trim();
 
     if (!normalizedTitle) {
@@ -37,15 +65,16 @@ export const uploadAsset = async (req, res) => {
       });
     }
 
+    const normalizedVisualType = normalizeVisualType(visualType);
     const imageUrl = req.file ? `/uploads/assets/${req.file.filename}` : null;
 
     const result = await pool.query(
       `
-      INSERT INTO assets (title, description, image_url, owner_user_id)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO assets (title, description, image_url, visual_type, owner_user_id)
+      VALUES ($1, $2, $3, $4, $5)
       RETURNING *
       `,
-      [normalizedTitle, description || null, imageUrl, req.user.id]
+      [normalizedTitle, description || null, imageUrl, normalizedVisualType, req.user.id]
     );
 
     res.status(201).json({
@@ -55,8 +84,13 @@ export const uploadAsset = async (req, res) => {
   } catch (error) {
     await removeUploadedFile(uploadedFilePath);
 
-    res.status(500).json({
-      message: "Error creating asset",
+    const statusCode =
+      error.message.includes("required") || error.message.includes("must be one of")
+        ? 400
+        : 500;
+
+    res.status(statusCode).json({
+      message: statusCode === 400 ? "Invalid asset input" : "Error creating asset",
       error: error.message
     });
   }
@@ -127,7 +161,7 @@ export const updateAsset = async (req, res) => {
 
   try {
     const assetId = Number(req.params.id);
-    const { title, description } = req.body;
+    const { title, description, visualType } = req.body;
     const normalizedTitle = title?.trim();
 
     if (!normalizedTitle) {
@@ -156,6 +190,10 @@ export const updateAsset = async (req, res) => {
     }
 
     const existingAsset = existingAssetResult.rows[0];
+    const normalizedVisualType = normalizeVisualType(
+      visualType,
+      existingAsset.visual_type || DEFAULT_VISUAL_TYPE
+    );
     const nextImageUrl = req.file
       ? `/uploads/assets/${req.file.filename}`
       : existingAsset.image_url;
@@ -163,11 +201,11 @@ export const updateAsset = async (req, res) => {
     const updatedAssetResult = await pool.query(
       `
       UPDATE assets
-      SET title = $1, description = $2, image_url = $3
-      WHERE id = $4
+      SET title = $1, description = $2, image_url = $3, visual_type = $4
+      WHERE id = $5
       RETURNING *
       `,
-      [normalizedTitle, description || null, nextImageUrl, assetId]
+      [normalizedTitle, description || null, nextImageUrl, normalizedVisualType, assetId]
     );
 
     if (req.file && existingAsset.image_url?.startsWith("/uploads/")) {
@@ -183,8 +221,13 @@ export const updateAsset = async (req, res) => {
   } catch (error) {
     await removeUploadedFile(uploadedFilePath);
 
-    res.status(500).json({
-      message: "Error updating asset",
+    const statusCode =
+      error.message.includes("required") || error.message.includes("must be one of")
+        ? 400
+        : 500;
+
+    res.status(statusCode).json({
+      message: statusCode === 400 ? "Invalid asset input" : "Error updating asset",
       error: error.message
     });
   }

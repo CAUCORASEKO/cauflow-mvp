@@ -7,6 +7,7 @@ import { buyerNav } from "@/lib/platform-nav";
 import { formatCurrency, formatDate, humanizeLabel } from "@/lib/utils";
 import { fetchEntitlements } from "@/services/api";
 import type { LicenseGrant } from "@/types/api";
+import { formatPackCategory, formatVisualAssetType } from "@/lib/visual-taxonomy";
 
 const getGrantTitle = (grant: LicenseGrant) =>
   grant.pack?.title || grant.asset?.title || `License #${grant.licenseId}`;
@@ -44,6 +45,13 @@ export function ActiveLicensesPage() {
                           grant.license.usage
                         )}`
                       : `License #${grant.licenseId}`}
+                  </p>
+                  <p className="mt-2 text-sm text-slate-400">
+                    {grant.pack
+                      ? formatPackCategory(grant.pack.category)
+                      : grant.asset
+                        ? formatVisualAssetType(grant.asset.visualType)
+                        : "Visual asset"}
                   </p>
                 </div>
 

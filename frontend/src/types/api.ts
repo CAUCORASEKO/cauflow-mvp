@@ -1,8 +1,17 @@
+export type VisualAssetType =
+  | "photography"
+  | "illustration"
+  | "concept_art"
+  | "character_design"
+  | "environment"
+  | "brand_visual";
+
 export interface Asset {
   id: number;
   title: string;
   description: string | null;
   imageUrl: string | null;
+  visualType: VisualAssetType;
   createdAt: string;
   ownerUserId?: number | null;
   creator?: AccountSummary | null;
@@ -61,6 +70,13 @@ export interface Purchase {
 export type PackStatus = "draft" | "published";
 
 export type PackCategory =
+  | "photography"
+  | "illustration"
+  | "concept_art"
+  | "character_design"
+  | "environment"
+  | "brand_visual"
+  | "mixed_visuals"
   | "visual"
   | "brand"
   | "character"

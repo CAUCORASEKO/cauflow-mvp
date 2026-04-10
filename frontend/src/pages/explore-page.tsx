@@ -11,12 +11,17 @@ import { formatLicenseType, formatLicenseUsage } from "@/lib/license-taxonomy";
 import { buyerNav } from "@/lib/platform-nav";
 import { formatCurrency, humanizeLabel } from "@/lib/utils";
 import {
+  formatPackCategory,
+  formatVisualAssetType,
+  visualAssetTypeOptions
+} from "@/lib/visual-taxonomy";
+import {
   createCheckoutSession,
   fetchExploreFeed,
   getAssetImageUrl,
   type ApiError
 } from "@/services/api";
-import type { Asset, ExploreFeed, License, Pack } from "@/types/api";
+import type { Asset, ExploreFeed, License, Pack, VisualAssetType } from "@/types/api";
 
 type PurchaseIntent =
   | { assetId: number; licenseId: number; label: string }
@@ -70,6 +75,9 @@ function ExploreAssetCard({
             <p className="text-[11px] uppercase tracking-[0.24em] text-sky-200">Asset license</p>
             <h3 className="mt-2 font-display text-2xl text-white">{asset.title}</h3>
             <p className="mt-2 text-sm text-slate-400">by {getCreatorLabel(asset.creator)}</p>
+            <p className="mt-3 inline-flex rounded-full border border-white/10 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-300">
+              {formatVisualAssetType(asset.visualType)}
+            </p>
           </div>
           <span className="rounded-full border border-white/10 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-300">
             {asset.monetizationReady ? "Available" : "Unavailable"}
@@ -185,7 +193,7 @@ function ExplorePackCard({
             <p className="mt-2 text-sm text-slate-400">by {getCreatorLabel(pack.creator)}</p>
           </div>
           <span className="rounded-full border border-white/10 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-300">
-            {humanizeLabel(pack.category)}
+            {formatPackCategory(pack.category)}
           </span>
         </div>
 
@@ -206,7 +214,11 @@ function ExplorePackCard({
           <div className="grid gap-2 text-sm text-slate-300">
             <div className="flex items-center justify-between gap-4">
               <span className="text-slate-500">Type</span>
-              <span className="text-white">Pack</span>
+              <span className="text-white">
+                {pack.coverAsset?.visualType
+                  ? formatVisualAssetType(pack.coverAsset.visualType)
+                  : "Pack"}
+              </span>
             </div>
             <div className="flex items-center justify-between gap-4">
               <span className="text-slate-500">Assets included</span>
@@ -264,6 +276,7 @@ export function ExplorePage() {
   const [feed, setFeed] = useState<ExploreFeed | null>(null);
   const [selectedAssetLicenses, setSelectedAssetLicenses] = useState<Record<number, number>>({});
   const [pendingLabel, setPendingLabel] = useState<string | null>(null);
+  const [visualTypeFilter, setVisualTypeFilter] = useState<"all" | VisualAssetType>("all");
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string; detail?: string } | null>(
     null
   );
@@ -309,11 +322,67 @@ export function ExplorePage() {
     }
   };
 
+  const filteredAssets =
+    visualTypeFilter === "all"
+      ? feed?.assets || []
+      : (feed?.assets || []).filter((asset) => asset.visualType === visualTypeFilter);
+
+  const filteredPacks =
+    visualTypeFilter === "all"
+      ? feed?.packs || []
+      : (feed?.packs || []).filter(
+          (pack) =>
+            pack.category === visualTypeFilter ||
+            (pack.category === "mixed_visuals" && pack.coverAsset?.visualType === visualTypeFilter)
+        );
+
   const content = (
     <div className="space-y-8">
       {feedback ? (
         <ActionFeedback tone={feedback.tone} message={feedback.message} detail={feedback.detail} />
       ) : null}
+
+      <section className="rounded-[28px] border border-white/10 bg-black/20 p-5">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.24em] text-sky-200">Visual taxonomy</p>
+            <h2 className="mt-2 font-display text-2xl text-white">Browse by visual discipline</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+              Filter the marketplace by the creative format buyers need to license.
+            </p>
+          </div>
+          <p className="text-sm text-slate-400">
+            {filteredAssets.length} assets · {filteredPacks.length} packs
+          </p>
+        </div>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <button
+            type="button"
+            className={`rounded-full border px-3 py-2 text-[11px] uppercase tracking-[0.18em] transition ${
+              visualTypeFilter === "all"
+                ? "border-sky-300/20 bg-sky-300/[0.12] text-sky-100"
+                : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.08]"
+            }`}
+            onClick={() => setVisualTypeFilter("all")}
+          >
+            All visual assets
+          </button>
+          {visualAssetTypeOptions.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={`rounded-full border px-3 py-2 text-[11px] uppercase tracking-[0.18em] transition ${
+                visualTypeFilter === option.value
+                  ? "border-sky-300/20 bg-sky-300/[0.12] text-sky-100"
+                  : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.08]"
+              }`}
+              onClick={() => setVisualTypeFilter(option.value)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </section>
 
       <section className="space-y-4">
         <div className="flex items-center justify-between gap-4">
@@ -321,11 +390,11 @@ export function ExplorePage() {
             <p className="text-[11px] uppercase tracking-[0.24em] text-sky-200">Single assets</p>
             <h2 className="mt-2 font-display text-3xl text-white">License one asset at a time</h2>
           </div>
-          <p className="text-sm text-slate-400">{feed?.assets.length || 0} offers</p>
+          <p className="text-sm text-slate-400">{filteredAssets.length} offers</p>
         </div>
 
         <div className="grid gap-5 xl:grid-cols-2">
-          {feed?.assets.map((asset) => (
+          {filteredAssets.map((asset) => (
             <ExploreAssetCard
               key={`asset-${asset.id}`}
               asset={asset}
@@ -347,11 +416,11 @@ export function ExplorePage() {
             <p className="text-[11px] uppercase tracking-[0.24em] text-sky-200">Packs</p>
             <h2 className="mt-2 font-display text-3xl text-white">License bundled collections</h2>
           </div>
-          <p className="text-sm text-slate-400">{feed?.packs.length || 0} published packs</p>
+          <p className="text-sm text-slate-400">{filteredPacks.length} published packs</p>
         </div>
 
         <div className="grid gap-5 xl:grid-cols-2">
-          {feed?.packs.map((pack) => (
+          {filteredPacks.map((pack) => (
             <ExplorePackCard
               key={`pack-${pack.id}`}
               pack={pack}
@@ -374,7 +443,7 @@ export function ExplorePage() {
             <p className="text-xs uppercase tracking-[0.24em] text-sky-200">Explore</p>
             <h1 className="mt-3 font-display text-5xl text-white">Browse licensable creative products</h1>
             <p className="mt-4 max-w-2xl text-lg leading-8 text-slate-300">
-              Review real offers before entering the protected buyer workspace for checkout, purchase records, and active rights.
+              Review licensable AI-native visual assets and curated packs before entering the protected buyer workspace for checkout, purchase records, and active rights.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link to="/signup">
@@ -392,7 +461,7 @@ export function ExplorePage() {
   }
 
   return (
-    <AppShell title="Explore marketplace" subtitle="Browse licensable assets and packs" navItems={buyerNav}>
+    <AppShell title="Explore marketplace" subtitle="Browse licensable visual assets and packs" navItems={buyerNav}>
       <section className="glass-panel rounded-[30px] border border-white/10 p-6 md:p-7">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
@@ -407,7 +476,7 @@ export function ExplorePage() {
               Licensing stays product-led.
             </p>
             <p className="mt-2 max-w-sm leading-6">
-              Offers show live license terms, monetization readiness, and a checkout path that records the purchase before rights activate.
+              Offers show live license terms, visual categories, monetization readiness, and a checkout path that records the purchase before rights activate.
             </p>
           </div>
         </div>

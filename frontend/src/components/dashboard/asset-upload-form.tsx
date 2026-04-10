@@ -5,15 +5,23 @@ import { ActionFeedback } from "@/components/dashboard/action-feedback";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  formatVisualAssetType,
+  getVisualAssetTypeDescription,
+  visualAssetTypeOptions
+} from "@/lib/visual-taxonomy";
+import type { Asset } from "@/types/api";
 
 export function AssetUploadForm({
   onCreated
 }: {
-  onCreated: (asset: { id: number; title: string; description: string | null; imageUrl: string | null; createdAt: string }) => void | Promise<void>;
+  onCreated: (asset: Asset) => void | Promise<void>;
 }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [visualType, setVisualType] = useState<Asset["visualType"]>("photography");
   const [image, setImage] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -62,9 +70,10 @@ export function AssetUploadForm({
     setFeedback(null);
 
     try {
-      const createdAsset = await createAsset({ title, description, image });
+      const createdAsset = await createAsset({ title, description, visualType, image });
       setTitle("");
       setDescription("");
+      setVisualType("photography");
       setImage(null);
       setFeedback("Asset created successfully.");
       await onCreated(createdAsset);
@@ -134,6 +143,37 @@ export function AssetUploadForm({
                   onChange={(event) => setTitle(event.target.value)}
                   required
                 />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-200">Visual category</label>
+                <Select
+                  value={visualType}
+                  onChange={(event) => setVisualType(event.target.value as Asset["visualType"])}
+                  required
+                >
+                  {visualAssetTypeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </Select>
+                <p className="text-sm leading-6 text-slate-400">
+                  Describe the visual format or creative discipline of this asset. This
+                  appears in marketplace and licensing surfaces.
+                </p>
+              </div>
+
+              <div className="rounded-[24px] border border-white/8 bg-black/20 px-4 py-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                  Classification
+                </p>
+                <p className="mt-2 text-sm font-medium text-white">
+                  {formatVisualAssetType(visualType)}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-400">
+                  {getVisualAssetTypeDescription(visualType)}
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -240,7 +280,7 @@ export function AssetUploadForm({
 
           <div className="flex flex-col gap-3 border-t border-white/8 pt-4 2xl:flex-row 2xl:items-center 2xl:justify-between">
             <p className="text-sm text-slate-400">
-              Uploaded assets appear immediately in the live inventory after refresh.
+              Uploaded visual assets appear immediately in the live inventory after refresh.
             </p>
             <Button
               type="submit"

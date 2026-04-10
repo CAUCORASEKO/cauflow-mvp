@@ -67,6 +67,7 @@ export const buildPurchaseSelect = (whereClause = "TRUE") => `
       a.title,
       a.description,
       a.image_url,
+      a.visual_type,
       a.created_at,
       a.owner_user_id
     FROM assets a
@@ -177,6 +178,7 @@ export const buildGrantSelect = (whereClause = "TRUE") => `
       a.title,
       a.description,
       a.image_url,
+      a.visual_type,
       a.created_at,
       a.owner_user_id
     FROM assets a
@@ -251,6 +253,7 @@ export const buildCheckoutSessionSelect = (whereClause = "pr.id = $1") => `
       a.title,
       a.description,
       a.image_url,
+      a.visual_type,
       a.created_at,
       a.owner_user_id
     FROM assets a

@@ -4,6 +4,7 @@ import type { Asset, License, Purchase } from "@/types/api";
 import { formatDate } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import type { AssetViewMode } from "@/components/dashboard/asset-inventory-toolbar";
+import { formatVisualAssetType } from "@/lib/visual-taxonomy";
 
 export function AssetsGrid({
   assets,
@@ -95,7 +96,7 @@ export function AssetsGrid({
                         Asset #{asset.id}
                       </span>
                       <span className="rounded-full border border-white/10 bg-black/35 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-white/80">
-                        {asset.imageUrl ? "Preview" : "No preview"}
+                        {formatVisualAssetType(asset.visualType)}
                       </span>
                     </div>
                   </div>
@@ -108,6 +109,9 @@ export function AssetsGrid({
                         <h3 className="line-clamp-1 font-display text-[1.35rem] font-semibold tracking-tight text-white">
                           {asset.title}
                         </h3>
+                        <p className="mt-2 text-[11px] uppercase tracking-[0.22em] text-sky-200">
+                          {formatVisualAssetType(asset.visualType)}
+                        </p>
                         <p className="mt-2 text-[11px] uppercase tracking-[0.22em] text-slate-500">
                           Added {formatDate(asset.createdAt)}
                         </p>
@@ -197,7 +201,7 @@ export function AssetsGrid({
                       #{asset.id}
                     </span>
                     <span className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-400">
-                      {asset.imageUrl ? "Preview" : "No preview"}
+                      {formatVisualAssetType(asset.visualType)}
                     </span>
                   </div>
                   <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-400">
