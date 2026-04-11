@@ -14,6 +14,23 @@ export const formatDate = (value: string) =>
     year: "numeric"
   }).format(new Date(value));
 
+export const formatFileSize = (value: number | null | undefined) => {
+  if (!value || value <= 0) {
+    return "Unknown size";
+  }
+
+  const units = ["B", "KB", "MB", "GB"];
+  let normalizedValue = value;
+  let unitIndex = 0;
+
+  while (normalizedValue >= 1024 && unitIndex < units.length - 1) {
+    normalizedValue /= 1024;
+    unitIndex += 1;
+  }
+
+  return `${normalizedValue.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+};
+
 export const humanizeLabel = (value: string) =>
   value
     .replace(/[_-]+/g, " ")

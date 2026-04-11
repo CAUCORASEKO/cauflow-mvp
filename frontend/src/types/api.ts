@@ -7,12 +7,35 @@ export type VisualAssetType =
   | "brand_visual";
 
 export type CatalogStatus = "draft" | "published" | "archived";
+export type AssetDeliveryStatus = "delivery_ready" | "needs_fixes";
+
+export interface AssetFileRecord {
+  url: string | null;
+  fileName: string | null;
+  mimeType: string | null;
+  fileSize: number | null;
+  width: number | null;
+  height: number | null;
+  aspectRatio: string | null;
+  resolutionSummary: string | null;
+}
+
+export interface AssetDeliveryReadiness {
+  isReady: boolean;
+  status: AssetDeliveryStatus;
+  notes: string[];
+  helperText: string;
+}
 
 export interface Asset {
   id: number;
   title: string;
   description: string | null;
   imageUrl: string | null;
+  previewImageUrl?: string | null;
+  previewFile?: AssetFileRecord | null;
+  masterFile?: AssetFileRecord | null;
+  deliveryReadiness?: AssetDeliveryReadiness | null;
   visualType: VisualAssetType;
   status: CatalogStatus;
   createdAt: string;

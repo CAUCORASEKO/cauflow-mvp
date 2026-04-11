@@ -84,6 +84,58 @@ ADD COLUMN IF NOT EXISTS status VARCHAR(50) NOT NULL DEFAULT 'published';
 ALTER TABLE assets
 ADD COLUMN IF NOT EXISTS owner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
 
+ALTER TABLE assets
+ADD COLUMN IF NOT EXISTS preview_image_url VARCHAR(500);
+
+ALTER TABLE assets
+ADD COLUMN IF NOT EXISTS preview_file_name VARCHAR(255);
+
+ALTER TABLE assets
+ADD COLUMN IF NOT EXISTS preview_mime_type VARCHAR(100);
+
+ALTER TABLE assets
+ADD COLUMN IF NOT EXISTS preview_file_size BIGINT;
+
+ALTER TABLE assets
+ADD COLUMN IF NOT EXISTS preview_width INTEGER;
+
+ALTER TABLE assets
+ADD COLUMN IF NOT EXISTS preview_height INTEGER;
+
+ALTER TABLE assets
+ADD COLUMN IF NOT EXISTS preview_aspect_ratio VARCHAR(50);
+
+ALTER TABLE assets
+ADD COLUMN IF NOT EXISTS preview_resolution_summary VARCHAR(100);
+
+ALTER TABLE assets
+ADD COLUMN IF NOT EXISTS master_file_url VARCHAR(500);
+
+ALTER TABLE assets
+ADD COLUMN IF NOT EXISTS master_file_name VARCHAR(255);
+
+ALTER TABLE assets
+ADD COLUMN IF NOT EXISTS master_mime_type VARCHAR(100);
+
+ALTER TABLE assets
+ADD COLUMN IF NOT EXISTS master_file_size BIGINT;
+
+ALTER TABLE assets
+ADD COLUMN IF NOT EXISTS master_width INTEGER;
+
+ALTER TABLE assets
+ADD COLUMN IF NOT EXISTS master_height INTEGER;
+
+ALTER TABLE assets
+ADD COLUMN IF NOT EXISTS master_aspect_ratio VARCHAR(50);
+
+ALTER TABLE assets
+ADD COLUMN IF NOT EXISTS master_resolution_summary VARCHAR(100);
+
+UPDATE assets
+SET preview_image_url = image_url
+WHERE preview_image_url IS NULL AND image_url IS NOT NULL;
+
 UPDATE assets
 SET visual_type = 'photography'
 WHERE visual_type IS NULL OR trim(visual_type) = '';

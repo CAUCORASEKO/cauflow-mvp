@@ -1,6 +1,12 @@
 import { Eye, FileImage, ImageIcon, PencilLine, Trash2 } from "lucide-react";
 import { getAssetImageUrl } from "@/services/api";
 import type { Asset, License, Purchase } from "@/types/api";
+import {
+  formatAssetDeliveryStatus,
+  getAssetDeliveryBadgeClassName,
+  getAssetPreviewUrl,
+  getAssetPrimaryReadinessNote
+} from "@/lib/asset-delivery";
 import { formatDate } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import type { AssetViewMode } from "@/components/dashboard/asset-inventory-toolbar";
@@ -57,11 +63,12 @@ export function AssetsGrid({
       }
     >
       {assets.map((asset) => {
-        const imageUrl = getAssetImageUrl(asset.imageUrl);
+        const imageUrl = getAssetImageUrl(getAssetPreviewUrl(asset));
         const isSelected = selectedAssetId === asset.id;
         const isUpdatingStatus = statusActionAssetId === asset.id;
         const licenseCount = licenseCountByAssetId.get(asset.id) || 0;
         const purchaseCount = purchaseCountByAssetId.get(asset.id) || 0;
+        const deliveryStatus = asset.deliveryReadiness?.status;
         const quickActionLabel =
           asset.status === "published"
             ? "Unpublish"
@@ -123,6 +130,13 @@ export function AssetsGrid({
                       >
                         {formatCatalogStatus(asset.status)}
                       </span>
+                      <span
+                        className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetDeliveryBadgeClassName(
+                          deliveryStatus
+                        )}`}
+                      >
+                        {formatAssetDeliveryStatus(deliveryStatus)}
+                      </span>
                     </div>
                   </div>
                 </button>
@@ -153,6 +167,17 @@ export function AssetsGrid({
                     <p className="min-h-[4.5rem] text-sm leading-6 text-slate-400">
                       {asset.description || "No description provided."}
                     </p>
+                    <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2.5">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                        Delivery readiness
+                      </p>
+                      <p className="mt-1 text-sm font-medium text-white">
+                        {formatAssetDeliveryStatus(deliveryStatus)}
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-slate-400">
+                        {getAssetPrimaryReadinessNote(asset)}
+                      </p>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
@@ -243,9 +268,19 @@ export function AssetsGrid({
                     >
                       {formatCatalogStatus(asset.status)}
                     </span>
+                    <span
+                      className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetDeliveryBadgeClassName(
+                        deliveryStatus
+                      )}`}
+                    >
+                      {formatAssetDeliveryStatus(deliveryStatus)}
+                    </span>
                   </div>
                   <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-400">
                     {asset.description || "No description provided."}
+                  </p>
+                  <p className="mt-3 text-sm leading-6 text-slate-300">
+                    {getAssetPrimaryReadinessNote(asset)}
                   </p>
                   <div className="mt-4 flex flex-wrap items-center gap-4 text-xs uppercase tracking-[0.18em] text-slate-500">
                     <span>Added {formatDate(asset.createdAt)}</span>

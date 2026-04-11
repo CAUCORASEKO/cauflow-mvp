@@ -51,6 +51,7 @@ import {
   updateLicense
 } from "@/services/api";
 import { formatCatalogStatus } from "@/lib/catalog-lifecycle";
+import { getAssetPreviewUrl } from "@/lib/asset-delivery";
 import { formatCurrency } from "@/lib/utils";
 import type { Asset, CatalogStatus, License, Pack, Purchase } from "@/types/api";
 
@@ -270,8 +271,8 @@ export function DashboardPage() {
 
         const matchesImageFilter =
           imageFilter === "all" ||
-          (imageFilter === "with-image" && Boolean(asset.imageUrl)) ||
-          (imageFilter === "without-image" && !asset.imageUrl);
+          (imageFilter === "with-image" && Boolean(getAssetPreviewUrl(asset))) ||
+          (imageFilter === "without-image" && !getAssetPreviewUrl(asset));
 
         return matchesStatus && matchesSearch && matchesImageFilter;
       })

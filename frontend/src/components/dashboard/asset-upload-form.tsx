@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { CheckCircle2, FileImage, LoaderCircle, UploadCloud } from "lucide-react";
+import {
+  CheckCircle2,
+  FileImage,
+  FolderUp,
+  LoaderCircle,
+  ShieldCheck,
+  UploadCloud
+} from "lucide-react";
 import { createAsset } from "@/services/api";
 import { ActionFeedback } from "@/components/dashboard/action-feedback";
 import { Button } from "@/components/ui/button";
@@ -7,12 +14,32 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { assetDeliveryRulesCopy } from "@/lib/asset-delivery";
 import {
   formatVisualAssetType,
   getVisualAssetTypeDescription,
   visualAssetTypeOptions
 } from "@/lib/visual-taxonomy";
+import { formatFileSize } from "@/lib/utils";
 import type { Asset } from "@/types/api";
+
+const uploadMeta = [
+  {
+    label: "Preview image",
+    helper: "Shown in workspace and marketplace surfaces."
+  },
+  {
+    label: "Master delivery file",
+    helper: "Unlocked later for licensed buyers."
+  },
+  {
+    label: "Delivery readiness",
+    helper: "Assets need a valid premium file before they are ready for high-value licensing."
+  }
+] as const;
+
+const filePickerClassName =
+  "group flex min-h-[220px] cursor-pointer flex-col rounded-[28px] border border-dashed p-4 transition-all duration-300 hover:border-sky-300/30 hover:bg-white/[0.04] hover:shadow-[0_18px_40px_rgba(2,8,23,0.18)]";
 
 export function AssetUploadForm({
   onCreated
@@ -22,28 +49,16 @@ export function AssetUploadForm({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [visualType, setVisualType] = useState<Asset["visualType"]>("photography");
-  const [image, setImage] = useState<File | null>(null);
+  const [previewImage, setPreviewImage] = useState<File | null>(null);
+  const [masterFile, setMasterFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isPickerActive, setIsPickerActive] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
 
-  const selectedFileLabel = useMemo(() => image?.name || "No image selected", [image]);
-  const selectedFileSize = useMemo(() => {
-    if (!image) {
-      return null;
-    }
-
-    return `${(image.size / (1024 * 1024)).toFixed(2)} MB`;
-  }, [image]);
-  const imagePreview = useMemo(() => {
-    if (!image) {
-      return null;
-    }
-
-    return URL.createObjectURL(image);
-  }, [image]);
+  const previewImageUrl = useMemo(
+    () => (previewImage ? URL.createObjectURL(previewImage) : null),
+    [previewImage]
+  );
 
   useEffect(() => {
     if (!feedback) {
@@ -51,17 +66,17 @@ export function AssetUploadForm({
     }
 
     const timeout = window.setTimeout(() => setFeedback(null), 3200);
-
     return () => window.clearTimeout(timeout);
   }, [feedback]);
 
-  useEffect(() => {
-    return () => {
-      if (imagePreview) {
-        URL.revokeObjectURL(imagePreview);
+  useEffect(
+    () => () => {
+      if (previewImageUrl) {
+        URL.revokeObjectURL(previewImageUrl);
       }
-    };
-  }, [imagePreview]);
+    },
+    [previewImageUrl]
+  );
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -70,18 +85,23 @@ export function AssetUploadForm({
     setFeedback(null);
 
     try {
-      const createdAsset = await createAsset({ title, description, visualType, image });
+      const createdAsset = await createAsset({
+        title,
+        description,
+        visualType,
+        previewImage,
+        masterFile
+      });
       setTitle("");
       setDescription("");
       setVisualType("photography");
-      setImage(null);
+      setPreviewImage(null);
+      setMasterFile(null);
       setFeedback("Asset created successfully.");
       await onCreated(createdAsset);
     } catch (submissionError) {
       setError(
-        submissionError instanceof Error
-          ? submissionError.message
-          : "Unable to create asset"
+        submissionError instanceof Error ? submissionError.message : "Unable to create asset"
       );
     } finally {
       setSubmitting(false);
@@ -93,15 +113,13 @@ export function AssetUploadForm({
       <div className="border-b border-white/10 bg-gradient-to-br from-white/[0.06] via-white/[0.03] to-transparent px-5 py-5 xl:px-6">
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-sky-200">
-              Asset intake
-            </p>
+            <p className="text-xs uppercase tracking-[0.24em] text-sky-200">Asset intake</p>
             <h3 className="mt-3 font-display text-[1.9rem] leading-none text-white">
               Upload new asset
             </h3>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-slate-400">
-              Register a licensable visual with strong metadata and a clean preview so
-              it enters the catalog ready for packaging.
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
+              Register a buyer-facing preview and the original premium file together, so the
+              catalog can distinguish presentation media from future licensed delivery.
             </p>
           </div>
           <div className="hidden h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-sky-200 md:flex">
@@ -110,30 +128,23 @@ export function AssetUploadForm({
         </div>
 
         <div className="grid gap-2.5 sm:grid-cols-3">
-          <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
-              Flow
-            </p>
-            <p className="mt-1 text-sm font-medium text-white">Asset to inventory</p>
-          </div>
-          <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
-              Required
-            </p>
-            <p className="mt-1 text-sm font-medium text-white">Title and image</p>
-          </div>
-          <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
-              Outcome
-            </p>
-            <p className="mt-1 text-sm font-medium text-white">Live preview card</p>
-          </div>
+          {uploadMeta.map((item) => (
+            <div
+              key={item.label}
+              className="rounded-2xl border border-white/8 bg-black/20 px-4 py-3"
+            >
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                {item.label}
+              </p>
+              <p className="mt-1 text-sm font-medium text-white">{item.helper}</p>
+            </div>
+          ))}
         </div>
       </div>
 
       <div className="p-5 xl:p-6">
         <form className="space-y-5" onSubmit={handleSubmit}>
-          <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr),272px]">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr),320px]">
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-200">Asset title</label>
@@ -159,8 +170,8 @@ export function AssetUploadForm({
                   ))}
                 </Select>
                 <p className="text-sm leading-6 text-slate-400">
-                  Describe the visual format or creative discipline of this asset. This
-                  appears in marketplace and licensing surfaces.
+                  Describe the visual format or creative discipline of this asset. This appears in
+                  marketplace and licensing surfaces.
                 </p>
               </div>
 
@@ -188,55 +199,87 @@ export function AssetUploadForm({
               </div>
             </div>
 
-            <label
-              className={`group flex min-h-[220px] cursor-pointer flex-col rounded-[28px] border border-dashed p-4 transition-all duration-300 2xl:min-h-[260px] ${
-                isDragging || isPickerActive
-                  ? "border-sky-300/40 bg-sky-300/[0.06] shadow-[0_0_0_1px_rgba(125,211,252,0.14),0_18px_40px_rgba(2,8,23,0.24)]"
-                  : "border-white/15 bg-white/[0.025] hover:border-sky-300/30 hover:bg-white/[0.04] hover:shadow-[0_18px_40px_rgba(2,8,23,0.18)]"
-              }`}
-              onDragEnter={() => setIsDragging(true)}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={() => setIsDragging(false)}
-            >
+            <div className="rounded-[28px] border border-white/10 bg-black/20 p-4">
+              <div className="flex items-center gap-2 text-slate-200">
+                <ShieldCheck className="h-4 w-4 text-sky-200" />
+                <p className="text-sm font-medium">Delivery readiness rules</p>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-slate-400">{assetDeliveryRulesCopy}</p>
+
+              <div className="mt-4 space-y-3">
+                <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                    Preview image
+                  </p>
+                  <p className="mt-2 text-sm text-white">
+                    {previewImage ? "Selected" : "Required for new assets"}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-400">
+                    Shown in workspace and marketplace surfaces.
+                  </p>
+                </div>
+                <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                    Master delivery file
+                  </p>
+                  <p className="mt-2 text-sm text-white">
+                    {masterFile ? "Selected" : "Optional now, required for ready status"}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-400">
+                    Original or premium file reserved for later buyer delivery.
+                  </p>
+                </div>
+                <div className="rounded-[22px] border border-sky-300/12 bg-sky-300/[0.05] p-4">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-sky-100/80">
+                    Supported files
+                  </p>
+                  <p className="mt-2 text-sm text-white">JPG, PNG, or WebP</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">
+                    Master files can be larger. Metadata and technical readiness are captured
+                    automatically when you upload.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <label className={`${filePickerClassName} border-white/15 bg-white/[0.025]`}>
               <input
                 type="file"
-                accept="image/*"
-                onChange={(event) => setImage(event.target.files?.[0] || null)}
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(event) => setPreviewImage(event.target.files?.[0] || null)}
                 className="sr-only"
-                onFocus={() => setIsPickerActive(true)}
-                onBlur={() => setIsPickerActive(false)}
+                required
               />
 
-              {imagePreview ? (
+              {previewImageUrl ? (
                 <div className="relative overflow-hidden rounded-2xl border border-white/10">
                   <img
-                    src={imagePreview}
-                    alt={selectedFileLabel}
-                    className="aspect-[16/10] w-full object-cover transition duration-500 group-hover:scale-[1.015] 2xl:aspect-[4/3]"
+                    src={previewImageUrl}
+                    alt={previewImage?.name || "Preview image"}
+                    className="aspect-[16/10] w-full object-cover transition duration-500 group-hover:scale-[1.015]"
                   />
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950 to-transparent p-4">
                     <div className="flex items-center justify-between gap-3">
                       <p className="truncate text-sm font-medium text-white">
-                        {selectedFileLabel}
+                        {previewImage?.name}
                       </p>
                       <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/15 bg-emerald-400/[0.12] px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-emerald-100">
                         <CheckCircle2 className="h-3.5 w-3.5" />
-                        Ready
+                        Preview set
                       </span>
                     </div>
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-white/8 bg-black/20 px-5 py-8 text-center transition-all duration-300 group-hover:border-sky-300/15 group-hover:bg-black/25">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5 text-sky-200 transition-all duration-300 group-hover:bg-sky-300/10 group-hover:shadow-[0_14px_28px_rgba(14,165,233,0.12)]">
+                <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-white/8 bg-black/20 px-5 py-8 text-center">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5 text-sky-200">
                     <FileImage className="h-6 w-6" />
                   </div>
-                  <p className="mt-5 text-sm font-medium text-white">
-                    Select a preview image
-                  </p>
+                  <p className="mt-5 text-sm font-medium text-white">Select a preview image</p>
                   <p className="mt-2 text-sm leading-6 text-slate-400">
-                    PNG, JPG, or WebP. The existing upload request stays unchanged while
-                    the workspace confirms the selected file more clearly.
+                    Shown in workspace and marketplace surfaces.
                   </p>
                 </div>
               )}
@@ -244,19 +287,71 @@ export function AssetUploadForm({
               <div className="mt-4 flex items-center justify-between gap-4">
                 <div>
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                    Current file
+                    Preview image
                   </p>
-                  <p className="mt-1 max-w-[180px] truncate text-sm text-slate-300">
-                    {selectedFileLabel}
+                  <p className="mt-1 max-w-[220px] truncate text-sm text-slate-300">
+                    {previewImage?.name || "No file selected"}
                   </p>
-                  {selectedFileSize ? (
-                    <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">
-                      {selectedFileSize}
-                    </p>
-                  ) : null}
+                  <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">
+                    {previewImage ? formatFileSize(previewImage.size) : "Required"}
+                  </p>
                 </div>
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white transition-all duration-300 group-hover:border-sky-300/20 group-hover:bg-sky-300/[0.08]">
-                  {image ? "Replace image" : "Choose image"}
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white">
+                  {previewImage ? "Replace preview" : "Choose preview"}
+                </span>
+              </div>
+            </label>
+
+            <label className={`${filePickerClassName} border-white/10 bg-black/20`}>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(event) => setMasterFile(event.target.files?.[0] || null)}
+                className="sr-only"
+              />
+
+              <div className="flex flex-1 flex-col justify-between rounded-2xl border border-white/8 bg-black/20 px-5 py-8">
+                <div className="text-center">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5 text-sky-200">
+                    <FolderUp className="h-6 w-6" />
+                  </div>
+                  <p className="mt-5 text-sm font-medium text-white">
+                    Add the master delivery file
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-400">
+                    Original or premium file reserved for licensed delivery later.
+                  </p>
+                </div>
+
+                <div className="mt-6 rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                    Delivery readiness
+                  </p>
+                  <p className="mt-2 text-sm text-white">
+                    {masterFile ? "Master file attached" : "Needs master file"}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-400">
+                    {masterFile
+                      ? "Metadata will be captured from the uploaded premium file."
+                      : "Assets without a master delivery file stay in needs-fixes status."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                    Master delivery file
+                  </p>
+                  <p className="mt-1 max-w-[220px] truncate text-sm text-slate-300">
+                    {masterFile?.name || "No file selected"}
+                  </p>
+                  <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">
+                    {masterFile ? formatFileSize(masterFile.size) : "Optional on create"}
+                  </p>
+                </div>
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white">
+                  {masterFile ? "Replace master" : "Choose master"}
                 </span>
               </div>
             </label>
@@ -266,7 +361,7 @@ export function AssetUploadForm({
             <ActionFeedback
               tone="pending"
               message="Uploading asset to the live workspace"
-              detail="The form stays connected to the current backend asset creation flow."
+              detail="Preview and master file metadata are being captured against the live asset record."
             />
           ) : null}
           {feedback ? (
@@ -280,7 +375,8 @@ export function AssetUploadForm({
 
           <div className="flex flex-col gap-3 border-t border-white/8 pt-4 2xl:flex-row 2xl:items-center 2xl:justify-between">
             <p className="text-sm text-slate-400">
-              Uploaded visual assets appear immediately in the live inventory after refresh.
+              Preview media stays buyer-facing. Master delivery files stay creator-side for the
+              next premium delivery phase.
             </p>
             <Button
               type="submit"

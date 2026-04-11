@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   FileImage,
+  FolderUp,
   LoaderCircle,
   PencilLine,
   ShieldCheck,
@@ -11,8 +12,16 @@ import {
 } from "lucide-react";
 import { fetchAssetById, getAssetImageUrl, updateAsset } from "@/services/api";
 import { formatLicenseType, formatLicenseUsage } from "@/lib/license-taxonomy";
-import { formatCurrency, formatDate } from "@/lib/utils";
-import type { Asset, License, Purchase } from "@/types/api";
+import {
+  assetDeliveryRulesCopy,
+  formatAssetDeliveryStatus,
+  getAssetDeliveryBadgeClassName,
+  getAssetFileMetaRows,
+  getAssetPreviewUrl,
+  getAssetPrimaryReadinessNote
+} from "@/lib/asset-delivery";
+import { formatCurrency, formatDate, formatFileSize } from "@/lib/utils";
+import type { Asset, AssetFileRecord, License, Purchase } from "@/types/api";
 import { ActionFeedback } from "@/components/dashboard/action-feedback";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +33,63 @@ import {
   getCatalogStatusHelperCopy
 } from "@/lib/catalog-lifecycle";
 import { formatVisualAssetType, visualAssetTypeOptions } from "@/lib/visual-taxonomy";
+
+function AssetFileCard({
+  label,
+  helper,
+  file,
+  fallback,
+  ctaLabel,
+  onChange
+}: {
+  label: string;
+  helper: string;
+  file: AssetFileRecord | null | undefined;
+  fallback: string;
+  ctaLabel?: string;
+  onChange?: (file: File | null) => void;
+}) {
+  const metaRows = getAssetFileMetaRows(file);
+
+  return (
+    <div className="rounded-[22px] border border-white/8 bg-slate-950/45 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{label}</p>
+          <p className="mt-2 text-sm font-medium text-white">
+            {file?.fileName || fallback}
+          </p>
+          <p className="mt-2 text-sm leading-6 text-slate-400">{helper}</p>
+        </div>
+        {onChange && ctaLabel ? (
+          <label className="focus-ring cursor-pointer rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-medium uppercase tracking-[0.18em] text-white hover:bg-white/[0.07]">
+            {ctaLabel}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="sr-only"
+              onChange={(event) => onChange(event.target.files?.[0] || null)}
+            />
+          </label>
+        ) : null}
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <span className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-300">
+          {file?.fileSize ? formatFileSize(file.fileSize) : "Metadata pending"}
+        </span>
+        {metaRows.map((row) => (
+          <span
+            key={row}
+            className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-400"
+          >
+            {row}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function AssetDetailDrawer({
   assetId,
@@ -50,7 +116,8 @@ export function AssetDetailDrawer({
   const [description, setDescription] = useState("");
   const [visualType, setVisualType] = useState<Asset["visualType"]>("photography");
   const [status, setStatus] = useState<Asset["status"]>("published");
-  const [replacementImage, setReplacementImage] = useState<File | null>(null);
+  const [replacementPreviewImage, setReplacementPreviewImage] = useState<File | null>(null);
+  const [replacementMasterFile, setReplacementMasterFile] = useState<File | null>(null);
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -60,7 +127,8 @@ export function AssetDetailDrawer({
       setAsset(null);
       setError(null);
       setIsEditing(false);
-      setReplacementImage(null);
+      setReplacementPreviewImage(null);
+      setReplacementMasterFile(null);
       setSaveFeedback(null);
       setSaveError(null);
       return;
@@ -131,21 +199,20 @@ export function AssetDetailDrawer({
     return () => window.clearTimeout(timeout);
   }, [saveError, saveFeedback]);
 
-  const replacementPreview = useMemo(() => {
-    if (!replacementImage) {
-      return null;
-    }
+  const replacementPreviewUrl = useMemo(
+    () =>
+      replacementPreviewImage ? URL.createObjectURL(replacementPreviewImage) : null,
+    [replacementPreviewImage]
+  );
 
-    return URL.createObjectURL(replacementImage);
-  }, [replacementImage]);
-
-  useEffect(() => {
-    return () => {
-      if (replacementPreview) {
-        URL.revokeObjectURL(replacementPreview);
+  useEffect(
+    () => () => {
+      if (replacementPreviewUrl) {
+        URL.revokeObjectURL(replacementPreviewUrl);
       }
-    };
-  }, [replacementPreview]);
+    },
+    [replacementPreviewUrl]
+  );
 
   const relatedLicenses = useMemo(
     () => (asset ? licenses.filter((license) => license.assetId === asset.id) : []),
@@ -164,8 +231,34 @@ export function AssetDetailDrawer({
     return null;
   }
 
-  const imageUrl = getAssetImageUrl(asset?.imageUrl || null);
-  const activeImagePreview = replacementPreview || imageUrl;
+  const basePreviewUrl = asset ? getAssetPreviewUrl(asset) : null;
+  const activeImagePreview = replacementPreviewUrl || getAssetImageUrl(basePreviewUrl);
+  const readinessStatus = asset?.deliveryReadiness?.status;
+  const readinessNotes = asset?.deliveryReadiness?.notes || [];
+  const previewDraftFile = replacementPreviewImage
+    ? {
+        fileName: replacementPreviewImage.name,
+        fileSize: replacementPreviewImage.size,
+        mimeType: replacementPreviewImage.type,
+        url: null,
+        width: null,
+        height: null,
+        aspectRatio: null,
+        resolutionSummary: null
+      }
+    : asset?.previewFile;
+  const masterDraftFile = replacementMasterFile
+    ? {
+        fileName: replacementMasterFile.name,
+        fileSize: replacementMasterFile.size,
+        mimeType: replacementMasterFile.type,
+        url: null,
+        width: null,
+        height: null,
+        aspectRatio: null,
+        resolutionSummary: null
+      }
+    : asset?.masterFile;
 
   const handleRetry = () => {
     setAsset(null);
@@ -174,7 +267,8 @@ export function AssetDetailDrawer({
     setSaveFeedback(null);
     setSaveError(null);
     setIsEditing(false);
-    setReplacementImage(null);
+    setReplacementPreviewImage(null);
+    setReplacementMasterFile(null);
     if (assetId) {
       setLoading(true);
       void fetchAssetById(assetId)
@@ -187,9 +281,7 @@ export function AssetDetailDrawer({
         })
         .catch((loadError) => {
           setAsset(null);
-          setError(
-            loadError instanceof Error ? loadError.message : "Unable to load asset"
-          );
+          setError(loadError instanceof Error ? loadError.message : "Unable to load asset");
         })
         .finally(() => {
           setLoading(false);
@@ -213,22 +305,22 @@ export function AssetDetailDrawer({
         description,
         visualType,
         status,
-        image: replacementImage
+        previewImage: replacementPreviewImage,
+        masterFile: replacementMasterFile
       });
       setAsset(updatedAsset);
       setTitle(updatedAsset.title);
       setDescription(updatedAsset.description || "");
       setVisualType(updatedAsset.visualType);
       setStatus(updatedAsset.status);
-      setReplacementImage(null);
+      setReplacementPreviewImage(null);
+      setReplacementMasterFile(null);
       setIsEditing(false);
       setSaveFeedback("Asset metadata updated successfully.");
       onAssetUpdated(updatedAsset);
     } catch (submissionError) {
       setSaveError(
-        submissionError instanceof Error
-          ? submissionError.message
-          : "Unable to update asset"
+        submissionError instanceof Error ? submissionError.message : "Unable to update asset"
       );
     } finally {
       setIsSaving(false);
@@ -248,8 +340,7 @@ export function AssetDetailDrawer({
         title: asset.title,
         description: asset.description || "",
         visualType: asset.visualType,
-        status: nextStatus,
-        image: null
+        status: nextStatus
       });
       setAsset(updatedAsset);
       setTitle(updatedAsset.title);
@@ -335,9 +426,7 @@ export function AssetDetailDrawer({
             </div>
           ) : asset ? (
             <div className="space-y-6">
-              {saveFeedback ? (
-                <ActionFeedback tone="success" message={saveFeedback} />
-              ) : null}
+              {saveFeedback ? <ActionFeedback tone="success" message={saveFeedback} /> : null}
               {saveError ? <ActionFeedback tone="error" message={saveError} /> : null}
 
               <div className="overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.03]">
@@ -357,7 +446,7 @@ export function AssetDetailDrawer({
                 )}
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-5">
+              <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-[22px] border border-white/8 bg-white/[0.025] p-4">
                   <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
                     Asset ID
@@ -366,11 +455,15 @@ export function AssetDetailDrawer({
                 </div>
                 <div className="rounded-[22px] border border-white/8 bg-white/[0.025] p-4">
                   <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
-                    Preview status
+                    Delivery state
                   </p>
-                  <p className="mt-2 text-sm font-medium text-white">
-                    {asset.imageUrl || replacementImage ? "Preview attached" : "Metadata only"}
-                  </p>
+                  <span
+                    className={`mt-2 inline-flex rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetDeliveryBadgeClassName(
+                      readinessStatus
+                    )}`}
+                  >
+                    {formatAssetDeliveryStatus(readinessStatus)}
+                  </span>
                 </div>
                 <div className="rounded-[22px] border border-white/8 bg-white/[0.025] p-4">
                   <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
@@ -481,7 +574,8 @@ export function AssetDetailDrawer({
                         setDescription(asset.description || "");
                         setVisualType(asset.visualType);
                         setStatus(asset.status);
-                        setReplacementImage(null);
+                        setReplacementPreviewImage(null);
+                        setReplacementMasterFile(null);
                         setSaveError(null);
                       }}
                     >
@@ -493,22 +587,50 @@ export function AssetDetailDrawer({
 
                 {!isEditing ? (
                   <div className="mt-4 space-y-4">
-                    <div>
-                      <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
-                        Lifecycle
-                      </p>
-                      <p className="mt-2 text-sm text-white">
-                        {formatCatalogStatus(asset.status)}
+                    <div className="rounded-[22px] border border-white/8 bg-slate-950/45 p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                            Delivery readiness
+                          </p>
+                          <p className="mt-2 text-sm text-white">
+                            {getAssetPrimaryReadinessNote(asset)}
+                          </p>
+                        </div>
+                        <span
+                          className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetDeliveryBadgeClassName(
+                            readinessStatus
+                          )}`}
+                        >
+                          {formatAssetDeliveryStatus(readinessStatus)}
+                        </span>
+                      </div>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {readinessNotes.map((note) => (
+                          <span
+                            key={note}
+                            className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-300"
+                          >
+                            {note}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="mt-4 text-sm leading-6 text-slate-400">
+                        {assetDeliveryRulesCopy}
                       </p>
                     </div>
-                    <div>
-                      <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
-                        Visual category
-                      </p>
-                      <p className="mt-2 text-sm text-white">
-                        {formatVisualAssetType(asset.visualType)}
-                      </p>
-                    </div>
+                    <AssetFileCard
+                      label="Preview image"
+                      helper="Shown in workspace and marketplace surfaces."
+                      file={asset.previewFile}
+                      fallback="No preview image uploaded"
+                    />
+                    <AssetFileCard
+                      label="Master delivery file"
+                      helper="Original or premium file reserved for later buyer download."
+                      file={asset.masterFile}
+                      fallback="No master delivery file uploaded"
+                    />
                     <div>
                       <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
                         Created
@@ -538,14 +660,12 @@ export function AssetDetailDrawer({
                         <option value="archived">Archived</option>
                       </Select>
                       <p className="text-sm leading-6 text-slate-400">
-                        Draft hides this asset from buyer-facing marketplace. Archived
-                        preserves history while removing it from active circulation.
+                        Draft hides this asset from buyer-facing marketplace. Archived preserves
+                        history while removing it from active circulation.
                       </p>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-slate-200">
-                        Asset title
-                      </label>
+                      <label className="text-sm font-medium text-slate-200">Asset title</label>
                       <Input
                         value={title}
                         onChange={(event) => setTitle(event.target.value)}
@@ -571,56 +691,53 @@ export function AssetDetailDrawer({
                         ))}
                       </Select>
                       <p className="text-sm leading-6 text-slate-400">
-                        Describe the visual format or creative discipline of this asset.
-                        This appears in marketplace and licensing surfaces.
+                        Describe the visual format or creative discipline of this asset. This
+                        appears in marketplace and licensing surfaces.
                       </p>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-slate-200">
-                        Description
-                      </label>
+                      <label className="text-sm font-medium text-slate-200">Description</label>
                       <Textarea
                         value={description}
                         onChange={(event) => setDescription(event.target.value)}
                         placeholder="Add stronger catalog context for this asset."
                       />
                     </div>
-                    <div className="space-y-3 rounded-[22px] border border-white/8 bg-slate-950/45 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-medium text-white">
-                            Replace preview image
-                          </p>
-                          <p className="mt-1 text-sm text-slate-400">
-                            Optional. Keep the current preview if no new image is selected.
-                          </p>
-                        </div>
-                        <label className="focus-ring cursor-pointer rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-medium uppercase tracking-[0.18em] text-white hover:bg-white/[0.07]">
-                          Choose image
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="sr-only"
-                            onChange={(event) =>
-                              setReplacementImage(event.target.files?.[0] || null)
-                            }
-                          />
-                        </label>
-                      </div>
-                      {replacementImage ? (
-                        <p className="text-sm text-sky-100">
-                          Selected: {replacementImage.name}
-                        </p>
-                      ) : (
-                        <p className="text-sm text-slate-500">No replacement image selected.</p>
-                      )}
+
+                    <div className="rounded-[22px] border border-sky-300/12 bg-sky-300/[0.05] p-4">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-sky-100/80">
+                        Delivery readiness
+                      </p>
+                      <p className="mt-2 text-sm text-white">
+                        {getAssetPrimaryReadinessNote(asset)}
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-slate-300">
+                        {assetDeliveryRulesCopy}
+                      </p>
                     </div>
+
+                    <AssetFileCard
+                      label="Preview image"
+                      helper="Shown in workspace and marketplace surfaces."
+                      file={previewDraftFile}
+                      fallback="Keep existing preview image"
+                      ctaLabel={replacementPreviewImage ? "Replace again" : "Choose image"}
+                      onChange={setReplacementPreviewImage}
+                    />
+                    <AssetFileCard
+                      label="Master delivery file"
+                      helper="Unlocked later for licensed buyers."
+                      file={masterDraftFile}
+                      fallback="Upload a premium delivery file"
+                      ctaLabel={replacementMasterFile ? "Replace again" : "Choose master"}
+                      onChange={setReplacementMasterFile}
+                    />
 
                     {isSaving ? (
                       <ActionFeedback
                         tone="pending"
                         message="Saving asset changes"
-                        detail="Metadata is being updated against the live API."
+                        detail="Metadata, preview, and master delivery details are being updated against the live API."
                       />
                     ) : null}
 
@@ -634,7 +751,8 @@ export function AssetDetailDrawer({
                           setDescription(asset.description || "");
                           setVisualType(asset.visualType);
                           setStatus(asset.status);
-                          setReplacementImage(null);
+                          setReplacementPreviewImage(null);
+                          setReplacementMasterFile(null);
                           setSaveError(null);
                         }}
                       >
@@ -717,7 +835,8 @@ export function AssetDetailDrawer({
                     <p className="text-sm font-medium">Delete asset</p>
                   </div>
                   <p className="mt-1 text-sm leading-6 text-slate-400">
-                    CauFlow blocks deletion when this asset is already used by packs, licenses, or commercial history. Remove the dependency before deleting.
+                    CauFlow blocks deletion when this asset is already used by packs, licenses, or
+                    commercial history. Remove the dependency before deleting.
                   </p>
                 </div>
                 <Button

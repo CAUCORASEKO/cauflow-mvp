@@ -110,6 +110,8 @@ export const createAsset = async (input: {
   description: string;
   visualType: Asset["visualType"];
   status?: Asset["status"];
+  previewImage?: File | null;
+  masterFile?: File | null;
   image?: File | null;
 }) => {
   const formData = new FormData();
@@ -120,8 +122,14 @@ export const createAsset = async (input: {
     formData.append("status", input.status);
   }
 
-  if (input.image) {
-    formData.append("image", input.image);
+  const previewImage = input.previewImage || input.image;
+
+  if (previewImage) {
+    formData.append("previewImage", previewImage);
+  }
+
+  if (input.masterFile) {
+    formData.append("masterFile", input.masterFile);
   }
 
   const response = await fetch(`${API_BASE_URL}/assets`, {
@@ -149,6 +157,8 @@ export const updateAsset = async (
     description: string;
     visualType: Asset["visualType"];
     status: Asset["status"];
+    previewImage?: File | null;
+    masterFile?: File | null;
     image?: File | null;
   }
 ) => {
@@ -158,8 +168,14 @@ export const updateAsset = async (
   formData.append("visualType", input.visualType);
   formData.append("status", input.status);
 
-  if (input.image) {
-    formData.append("image", input.image);
+  const previewImage = input.previewImage || input.image;
+
+  if (previewImage) {
+    formData.append("previewImage", previewImage);
+  }
+
+  if (input.masterFile) {
+    formData.append("masterFile", input.masterFile);
   }
 
   const response = await fetch(`${API_BASE_URL}/assets/${assetId}`, {
