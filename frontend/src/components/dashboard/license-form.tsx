@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { formatCatalogStatus } from "@/lib/catalog-lifecycle";
 
 export function LicenseForm({
   assets,
@@ -24,6 +25,7 @@ export function LicenseForm({
   assets: Asset[];
   onCreated: (license: License) => void | Promise<void>;
 }) {
+  const availableAssets = assets.filter((asset) => asset.status !== "archived");
   const [assetId, setAssetId] = useState("");
   const [type, setType] = useState("Standard");
   const [price, setPrice] = useState("");
@@ -110,12 +112,15 @@ export function LicenseForm({
                 required
               >
                 <option value="">Select an asset</option>
-                {assets.map((asset) => (
+                {availableAssets.map((asset) => (
                   <option key={asset.id} value={asset.id}>
-                    {asset.title}
+                    {asset.title} · {formatCatalogStatus(asset.status)}
                   </option>
                 ))}
               </Select>
+              <p className="text-sm leading-6 text-slate-400">
+                Archived assets are preserved for history, but kept out of new rights packaging.
+              </p>
             </div>
 
             <LicenseCommercialFields
@@ -186,7 +191,7 @@ export function LicenseForm({
           <Button
             type="submit"
             variant="primary"
-            disabled={submitting || assets.length === 0}
+            disabled={submitting || availableAssets.length === 0}
             className="min-w-[168px] gap-2"
             aria-busy={submitting}
           >

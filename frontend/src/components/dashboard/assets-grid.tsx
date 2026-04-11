@@ -4,6 +4,7 @@ import type { Asset, License, Purchase } from "@/types/api";
 import { formatDate } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import type { AssetViewMode } from "@/components/dashboard/asset-inventory-toolbar";
+import { formatCatalogStatus, getCatalogStatusBadgeClassName } from "@/lib/catalog-lifecycle";
 import { formatVisualAssetType } from "@/lib/visual-taxonomy";
 
 export function AssetsGrid({
@@ -97,6 +98,13 @@ export function AssetsGrid({
                       </span>
                       <span className="rounded-full border border-white/10 bg-black/35 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-white/80">
                         {formatVisualAssetType(asset.visualType)}
+                      </span>
+                      <span
+                        className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getCatalogStatusBadgeClassName(
+                          asset.status
+                        )}`}
+                      >
+                        {formatCatalogStatus(asset.status)}
                       </span>
                     </div>
                   </div>
@@ -202,6 +210,13 @@ export function AssetsGrid({
                     </span>
                     <span className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-400">
                       {formatVisualAssetType(asset.visualType)}
+                    </span>
+                    <span
+                      className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] ${getCatalogStatusBadgeClassName(
+                        asset.status
+                      )}`}
+                    >
+                      {formatCatalogStatus(asset.status)}
                     </span>
                   </div>
                   <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-400">

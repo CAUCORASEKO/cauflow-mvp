@@ -19,6 +19,7 @@ export const getExploreFeed = async (req, res) => {
           a.description,
           a.image_url,
           a.visual_type,
+          a.status,
           a.created_at,
           a.owner_user_id,
           row_to_json(creator_summary) AS creator,
@@ -54,6 +55,7 @@ export const getExploreFeed = async (req, res) => {
               'type', l.type,
               'price', l.price,
               'usage', l.usage,
+              'status', l.status,
               'created_at', l.created_at,
               'policy', (
                 SELECT row_to_json(lp)
@@ -68,7 +70,10 @@ export const getExploreFeed = async (req, res) => {
           ) AS items
           FROM licenses l
           WHERE l.asset_id = a.id
+            AND l.status = 'published'
         ) AS license_options ON true
+        WHERE a.status = 'published'
+          AND license_options.items IS NOT NULL
         ORDER BY a.created_at DESC
         LIMIT 12
         `
@@ -112,10 +117,12 @@ export const getExploreFeed = async (req, res) => {
             a.description,
             a.image_url,
             a.visual_type,
+            a.status,
             a.created_at,
             a.owner_user_id
           FROM assets a
           WHERE a.id = p.cover_asset_id
+            AND a.status = 'published'
         ) AS cover_asset ON true
         LEFT JOIN LATERAL (
           SELECT
@@ -124,6 +131,7 @@ export const getExploreFeed = async (req, res) => {
             l.type,
             l.price,
             l.usage,
+            l.status,
             l.created_at,
             (
               SELECT row_to_json(lp)
@@ -135,6 +143,7 @@ export const getExploreFeed = async (req, res) => {
             ) AS policy
           FROM licenses l
           WHERE l.id = p.license_id
+            AND l.status = 'published'
         ) AS base_license ON true
         LEFT JOIN LATERAL (
           SELECT
@@ -149,14 +158,17 @@ export const getExploreFeed = async (req, res) => {
           WHERE u.id = p.owner_user_id
         ) AS creator_summary ON true
         WHERE p.status = 'published'
+          AND cover_asset.id IS NOT NULL
+          AND base_license.id IS NOT NULL
         ORDER BY p.updated_at DESC
         LIMIT 12
         `
       ),
       pool.query(
         `
-        SELECT id, asset_id, type, price, usage, created_at
+        SELECT id, asset_id, type, price, usage, status, created_at
         FROM licenses
+        WHERE status = 'published'
         ORDER BY created_at DESC
         LIMIT 12
         `

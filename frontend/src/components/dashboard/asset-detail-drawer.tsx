@@ -18,6 +18,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  formatCatalogStatus,
+  getCatalogStatusBadgeClassName,
+  getCatalogStatusHelperCopy
+} from "@/lib/catalog-lifecycle";
 import { formatVisualAssetType, visualAssetTypeOptions } from "@/lib/visual-taxonomy";
 
 export function AssetDetailDrawer({
@@ -44,6 +49,7 @@ export function AssetDetailDrawer({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [visualType, setVisualType] = useState<Asset["visualType"]>("photography");
+  const [status, setStatus] = useState<Asset["status"]>("published");
   const [replacementImage, setReplacementImage] = useState<File | null>(null);
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -91,6 +97,7 @@ export function AssetDetailDrawer({
         setTitle(nextAsset.title);
         setDescription(nextAsset.description || "");
         setVisualType(nextAsset.visualType);
+        setStatus(nextAsset.status);
       } catch (loadError) {
         if (cancelled) {
           return;
@@ -176,6 +183,7 @@ export function AssetDetailDrawer({
           setTitle(nextAsset.title);
           setDescription(nextAsset.description || "");
           setVisualType(nextAsset.visualType);
+          setStatus(nextAsset.status);
         })
         .catch((loadError) => {
           setAsset(null);
@@ -204,12 +212,14 @@ export function AssetDetailDrawer({
         title,
         description,
         visualType,
+        status,
         image: replacementImage
       });
       setAsset(updatedAsset);
       setTitle(updatedAsset.title);
       setDescription(updatedAsset.description || "");
       setVisualType(updatedAsset.visualType);
+      setStatus(updatedAsset.status);
       setReplacementImage(null);
       setIsEditing(false);
       setSaveFeedback("Asset metadata updated successfully.");
@@ -219,6 +229,40 @@ export function AssetDetailDrawer({
         submissionError instanceof Error
           ? submissionError.message
           : "Unable to update asset"
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleStatusChange = async (nextStatus: Asset["status"]) => {
+    if (!asset || nextStatus === asset.status) {
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      setSaveFeedback(null);
+      setSaveError(null);
+      const updatedAsset = await updateAsset(asset.id, {
+        title: asset.title,
+        description: asset.description || "",
+        visualType: asset.visualType,
+        status: nextStatus,
+        image: null
+      });
+      setAsset(updatedAsset);
+      setTitle(updatedAsset.title);
+      setDescription(updatedAsset.description || "");
+      setVisualType(updatedAsset.visualType);
+      setStatus(updatedAsset.status);
+      setSaveFeedback(`Asset moved to ${formatCatalogStatus(nextStatus).toLowerCase()}.`);
+      onAssetUpdated(updatedAsset);
+    } catch (submissionError) {
+      setSaveError(
+        submissionError instanceof Error
+          ? submissionError.message
+          : "Unable to update asset lifecycle"
       );
     } finally {
       setIsSaving(false);
@@ -338,6 +382,14 @@ export function AssetDetailDrawer({
                 </div>
                 <div className="rounded-[22px] border border-white/8 bg-white/[0.025] p-4">
                   <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                    Lifecycle
+                  </p>
+                  <p className="mt-2 text-sm font-medium text-white">
+                    {formatCatalogStatus(asset.status)}
+                  </p>
+                </div>
+                <div className="rounded-[22px] border border-white/8 bg-white/[0.025] p-4">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
                     Licenses
                   </p>
                   <p className="mt-2 text-sm font-medium text-white">
@@ -355,6 +407,64 @@ export function AssetDetailDrawer({
               </div>
 
               <section className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
+                <div className="mb-5 rounded-[22px] border border-white/8 bg-slate-950/45 p-4">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <span
+                        className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getCatalogStatusBadgeClassName(
+                          asset.status
+                        )}`}
+                      >
+                        {formatCatalogStatus(asset.status)}
+                      </span>
+                      <p className="mt-3 text-sm leading-6 text-slate-300">
+                        {getCatalogStatusHelperCopy(asset.status, "This asset")}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {asset.status !== "published" ? (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          disabled={isSaving}
+                          onClick={() => void handleStatusChange("published")}
+                        >
+                          Publish
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          disabled={isSaving}
+                          onClick={() => void handleStatusChange("draft")}
+                        >
+                          Unpublish
+                        </Button>
+                      )}
+                      {asset.status !== "archived" ? (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="border-amber-300/20 bg-amber-300/[0.08] text-amber-100 hover:bg-amber-300/[0.14]"
+                          disabled={isSaving}
+                          onClick={() => void handleStatusChange("archived")}
+                        >
+                          Archive
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          disabled={isSaving}
+                          onClick={() => void handleStatusChange("draft")}
+                        >
+                          Restore
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex items-center gap-2 text-slate-300">
                     <Sparkles className="h-4 w-4 text-sky-200" />
@@ -370,6 +480,7 @@ export function AssetDetailDrawer({
                         setTitle(asset.title);
                         setDescription(asset.description || "");
                         setVisualType(asset.visualType);
+                        setStatus(asset.status);
                         setReplacementImage(null);
                         setSaveError(null);
                       }}
@@ -382,6 +493,14 @@ export function AssetDetailDrawer({
 
                 {!isEditing ? (
                   <div className="mt-4 space-y-4">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                        Lifecycle
+                      </p>
+                      <p className="mt-2 text-sm text-white">
+                        {formatCatalogStatus(asset.status)}
+                      </p>
+                    </div>
                     <div>
                       <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
                         Visual category
@@ -407,6 +526,22 @@ export function AssetDetailDrawer({
                   </div>
                 ) : (
                   <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-slate-200">Lifecycle</label>
+                      <Select
+                        value={status}
+                        onChange={(event) => setStatus(event.target.value as Asset["status"])}
+                        required
+                      >
+                        <option value="draft">Draft</option>
+                        <option value="published">Published</option>
+                        <option value="archived">Archived</option>
+                      </Select>
+                      <p className="text-sm leading-6 text-slate-400">
+                        Draft hides this asset from buyer-facing marketplace. Archived
+                        preserves history while removing it from active circulation.
+                      </p>
+                    </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-slate-200">
                         Asset title
@@ -498,6 +633,7 @@ export function AssetDetailDrawer({
                           setTitle(asset.title);
                           setDescription(asset.description || "");
                           setVisualType(asset.visualType);
+                          setStatus(asset.status);
                           setReplacementImage(null);
                           setSaveError(null);
                         }}

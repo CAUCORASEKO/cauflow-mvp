@@ -4,11 +4,13 @@ import { formatLicenseType } from "@/lib/license-taxonomy";
 import { getAssetImageUrl } from "@/services/api";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { Pack } from "@/types/api";
+import { formatCatalogStatus } from "@/lib/catalog-lifecycle";
 import { formatPackCategory, formatVisualAssetType } from "@/lib/visual-taxonomy";
 
 const statusClassName: Record<Pack["status"], string> = {
   draft: "border-white/10 bg-white/[0.04] text-slate-300",
-  published: "border-emerald-400/20 bg-emerald-400/[0.1] text-emerald-100"
+  published: "border-emerald-400/20 bg-emerald-400/[0.1] text-emerald-100",
+  archived: "border-amber-300/20 bg-amber-300/[0.1] text-amber-100"
 };
 
 export function PackList({
@@ -72,7 +74,7 @@ export function PackList({
                       statusClassName[pack.status]
                     )}
                   >
-                    {pack.status}
+                    {formatCatalogStatus(pack.status)}
                   </span>
                   <span className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-300/80">
                     {formatPackCategory(pack.category)}

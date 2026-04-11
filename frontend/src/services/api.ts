@@ -109,12 +109,16 @@ export const createAsset = async (input: {
   title: string;
   description: string;
   visualType: Asset["visualType"];
+  status?: Asset["status"];
   image?: File | null;
 }) => {
   const formData = new FormData();
   formData.append("title", input.title);
   formData.append("description", input.description);
   formData.append("visualType", input.visualType);
+  if (input.status) {
+    formData.append("status", input.status);
+  }
 
   if (input.image) {
     formData.append("image", input.image);
@@ -144,6 +148,7 @@ export const updateAsset = async (
     title: string;
     description: string;
     visualType: Asset["visualType"];
+    status: Asset["status"];
     image?: File | null;
   }
 ) => {
@@ -151,6 +156,7 @@ export const updateAsset = async (
   formData.append("title", input.title);
   formData.append("description", input.description);
   formData.append("visualType", input.visualType);
+  formData.append("status", input.status);
 
   if (input.image) {
     formData.append("image", input.image);
@@ -184,6 +190,7 @@ export const createLicense = async (input: {
   type: string;
   price: number;
   usage: string;
+  status?: License["status"];
   policy?: LicensePolicyInput | null;
 }) => {
   const response = await fetch(`${API_BASE_URL}/licenses`, {
@@ -203,6 +210,7 @@ export const updateLicense = async (
     type: string;
     price: number;
     usage: string;
+    status: License["status"];
     policy?: LicensePolicyInput | null;
   }
 ) => {

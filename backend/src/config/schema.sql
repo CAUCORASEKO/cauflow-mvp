@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS assets (
   description TEXT,
   image_url VARCHAR(500),
   visual_type VARCHAR(50) NOT NULL DEFAULT 'photography',
+  status VARCHAR(50) NOT NULL DEFAULT 'published',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -78,11 +79,18 @@ ALTER TABLE assets
 ADD COLUMN IF NOT EXISTS visual_type VARCHAR(50) NOT NULL DEFAULT 'photography';
 
 ALTER TABLE assets
+ADD COLUMN IF NOT EXISTS status VARCHAR(50) NOT NULL DEFAULT 'published';
+
+ALTER TABLE assets
 ADD COLUMN IF NOT EXISTS owner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
 
 UPDATE assets
 SET visual_type = 'photography'
 WHERE visual_type IS NULL OR trim(visual_type) = '';
+
+UPDATE assets
+SET status = 'published'
+WHERE status IS NULL OR trim(status) = '';
 
 CREATE TABLE IF NOT EXISTS licenses (
   id SERIAL PRIMARY KEY,
@@ -90,11 +98,19 @@ CREATE TABLE IF NOT EXISTS licenses (
   type VARCHAR(100) NOT NULL,
   price NUMERIC(10,2) NOT NULL,
   usage VARCHAR(100) NOT NULL,
+  status VARCHAR(50) NOT NULL DEFAULT 'published',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 ALTER TABLE licenses
 ADD COLUMN IF NOT EXISTS owner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+
+ALTER TABLE licenses
+ADD COLUMN IF NOT EXISTS status VARCHAR(50) NOT NULL DEFAULT 'published';
+
+UPDATE licenses
+SET status = 'published'
+WHERE status IS NULL OR trim(status) = '';
 
 CREATE TABLE IF NOT EXISTS license_policies (
   id SERIAL PRIMARY KEY,

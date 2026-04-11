@@ -6,12 +6,15 @@ export type VisualAssetType =
   | "environment"
   | "brand_visual";
 
+export type CatalogStatus = "draft" | "published" | "archived";
+
 export interface Asset {
   id: number;
   title: string;
   description: string | null;
   imageUrl: string | null;
   visualType: VisualAssetType;
+  status: CatalogStatus;
   createdAt: string;
   ownerUserId?: number | null;
   creator?: AccountSummary | null;
@@ -43,6 +46,7 @@ export interface License {
   type: string;
   price: number;
   usage: string;
+  status: CatalogStatus;
   createdAt: string;
   ownerUserId?: number | null;
   policy?: LicensePolicy | null;
@@ -67,7 +71,7 @@ export interface Purchase {
   buyer?: AccountSummary | null;
 }
 
-export type PackStatus = "draft" | "published";
+export type PackStatus = CatalogStatus;
 
 export type PackCategory =
   | "photography"

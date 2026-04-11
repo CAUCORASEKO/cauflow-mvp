@@ -6,6 +6,22 @@ import {
 } from "../utils/license-policy.js";
 import { buildLicenseDeleteBlockMessage } from "../utils/delete-constraints.js";
 
+const LICENSE_STATUSES = new Set(["draft", "published", "archived"]);
+
+const normalizeLicenseStatus = (value, fallback = "published") => {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return fallback;
+  }
+
+  const normalizedValue = value.trim().toLowerCase();
+
+  if (!LICENSE_STATUSES.has(normalizedValue)) {
+    throw new Error("status must be one of: draft, published, archived");
+  }
+
+  return normalizedValue;
+};
+
 const fetchPolicyByLicenseId = async (db, licenseId) => {
   const result = await db.query(
     `
@@ -149,7 +165,7 @@ export const createLicense = async (req, res) => {
   const client = await pool.connect();
 
   try {
-    const { assetId, type, price, usage, policy } = req.body;
+    const { assetId, type, price, usage, policy, status } = req.body;
 
     if (!assetId || !type || price === undefined || !usage) {
       return res.status(400).json({
@@ -174,15 +190,17 @@ export const createLicense = async (req, res) => {
       });
     }
 
+    const normalizedStatus = normalizeLicenseStatus(status);
+
     await client.query("BEGIN");
 
     const result = await client.query(
       `
-      INSERT INTO licenses (asset_id, type, price, usage, owner_user_id)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO licenses (asset_id, type, price, usage, status, owner_user_id)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
       `,
-      [numericAssetId, type, price, usage, req.user.id]
+      [numericAssetId, type, price, usage, normalizedStatus, req.user.id]
     );
 
     const createdLicense = result.rows[0];
@@ -204,7 +222,8 @@ export const createLicense = async (req, res) => {
 
     const statusCode =
       error.message === "policy must be a valid object" ||
-      error.message.startsWith("policy.")
+      error.message.startsWith("policy.") ||
+      error.message.includes("status must be one of")
         ? 400
         : 500;
 
@@ -231,6 +250,7 @@ export const getLicenses = async (req, res) => {
           )
         : await pool.query(`
             SELECT * FROM licenses
+            WHERE status = 'published'
             ORDER BY id ASC
           `);
 
@@ -253,10 +273,19 @@ export const getLicenseById = async (req, res) => {
     const licenseId = Number(req.params.id);
     const licenseWithPolicy = await fetchLicenseWithPolicyById(pool, licenseId);
 
-    if (
-      !licenseWithPolicy ||
-      (req.user?.role === "creator" && licenseWithPolicy.owner_user_id !== req.user.id)
-    ) {
+    if (!licenseWithPolicy) {
+      return res.status(404).json({
+        message: "License not found"
+      });
+    }
+
+    if (req.user?.role === "creator" && licenseWithPolicy.owner_user_id !== req.user.id) {
+      return res.status(404).json({
+        message: "License not found"
+      });
+    }
+
+    if (req.user?.role !== "creator" && licenseWithPolicy.status !== "published") {
       return res.status(404).json({
         message: "License not found"
       });
@@ -279,7 +308,7 @@ export const updateLicense = async (req, res) => {
 
   try {
     const licenseId = Number(req.params.id);
-    const { type, price, usage, policy } = req.body;
+    const { type, price, usage, policy, status } = req.body;
 
     if (!type || price === undefined || !usage) {
       return res.status(400).json({
@@ -287,17 +316,39 @@ export const updateLicense = async (req, res) => {
       });
     }
 
+    const existingLicenseResult = await client.query(
+      `
+      SELECT *
+      FROM licenses
+      WHERE id = $1
+        AND ($2 = 'admin' OR owner_user_id = $3)
+      LIMIT 1
+      `,
+      [licenseId, req.user.role, req.user.id]
+    );
+
+    if (existingLicenseResult.rows.length === 0) {
+      return res.status(404).json({
+        message: "License not found"
+      });
+    }
+
+    const normalizedStatus = normalizeLicenseStatus(
+      status,
+      existingLicenseResult.rows[0].status || "published"
+    );
+
     await client.query("BEGIN");
 
     const result = await client.query(
       `
       UPDATE licenses
-      SET type = $1, price = $2, usage = $3
-      WHERE id = $4
-        AND ($5 = 'admin' OR owner_user_id = $6)
+      SET type = $1, price = $2, usage = $3, status = $4
+      WHERE id = $5
+        AND ($6 = 'admin' OR owner_user_id = $7)
       RETURNING *
       `,
-      [type, price, usage, licenseId, req.user.role, req.user.id]
+      [type, price, usage, normalizedStatus, licenseId, req.user.role, req.user.id]
     );
 
     if (result.rows.length === 0) {
@@ -329,7 +380,8 @@ export const updateLicense = async (req, res) => {
 
     const statusCode =
       error.message === "policy must be a valid object" ||
-      error.message.startsWith("policy.")
+      error.message.startsWith("policy.") ||
+      error.message.includes("status must be one of")
         ? 400
         : 500;
 

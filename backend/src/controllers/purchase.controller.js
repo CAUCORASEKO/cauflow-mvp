@@ -16,7 +16,7 @@ export const createPurchase = async (req, res) => {
 
     const licenseResult = await pool.query(
       `
-      SELECT l.*, a.owner_user_id AS asset_owner_user_id
+      SELECT l.*, a.owner_user_id AS asset_owner_user_id, a.status AS asset_status
       FROM licenses l
       JOIN assets a
         ON a.id = l.asset_id
@@ -32,6 +32,12 @@ export const createPurchase = async (req, res) => {
     }
 
     const license = licenseResult.rows[0];
+
+    if (license.status !== "published" || license.asset_status !== "published") {
+      return res.status(409).json({
+        message: "This visual asset is no longer available for new purchases"
+      });
+    }
 
     const result = await pool.query(
       `

@@ -16,6 +16,7 @@ const VISUAL_TYPES = new Set([
   "environment",
   "brand_visual"
 ]);
+const ASSET_STATUSES = new Set(["draft", "published", "archived"]);
 
 const normalizeVisualType = (value, fallback = DEFAULT_VISUAL_TYPE) => {
   if (typeof value !== "string" || value.trim().length === 0) {
@@ -31,6 +32,20 @@ const normalizeVisualType = (value, fallback = DEFAULT_VISUAL_TYPE) => {
     throw new Error(
       "visualType must be one of: photography, illustration, concept_art, character_design, environment, brand_visual"
     );
+  }
+
+  return normalizedValue;
+};
+
+const normalizeAssetStatus = (value, fallback = "published") => {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return fallback;
+  }
+
+  const normalizedValue = value.trim().toLowerCase();
+
+  if (!ASSET_STATUSES.has(normalizedValue)) {
+    throw new Error("status must be one of: draft, published, archived");
   }
 
   return normalizedValue;
@@ -54,7 +69,7 @@ export const uploadAsset = async (req, res) => {
   const uploadedFilePath = req.file?.path;
 
   try {
-    const { title, description, visualType } = req.body;
+    const { title, description, visualType, status } = req.body;
     const normalizedTitle = title?.trim();
 
     if (!normalizedTitle) {
@@ -66,15 +81,23 @@ export const uploadAsset = async (req, res) => {
     }
 
     const normalizedVisualType = normalizeVisualType(visualType);
+    const normalizedStatus = normalizeAssetStatus(status);
     const imageUrl = req.file ? `/uploads/assets/${req.file.filename}` : null;
 
     const result = await pool.query(
       `
-      INSERT INTO assets (title, description, image_url, visual_type, owner_user_id)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO assets (title, description, image_url, visual_type, status, owner_user_id)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
       `,
-      [normalizedTitle, description || null, imageUrl, normalizedVisualType, req.user.id]
+      [
+        normalizedTitle,
+        description || null,
+        imageUrl,
+        normalizedVisualType,
+        normalizedStatus,
+        req.user.id
+      ]
     );
 
     res.status(201).json({
@@ -110,6 +133,7 @@ export const getAssets = async (req, res) => {
           )
         : await pool.query(`
             SELECT * FROM assets
+            WHERE status = 'published'
             ORDER BY id ASC
           `);
 
@@ -134,6 +158,7 @@ export const getAssetById = async (req, res) => {
       SELECT * FROM assets
       WHERE id = $1
         AND ($2::text IS DISTINCT FROM 'creator' OR owner_user_id = $3)
+        AND ($2::text = 'creator' OR status = 'published')
       `,
       [assetId, req.user?.role || null, req.user?.id || null]
     );
@@ -161,7 +186,7 @@ export const updateAsset = async (req, res) => {
 
   try {
     const assetId = Number(req.params.id);
-    const { title, description, visualType } = req.body;
+    const { title, description, visualType, status } = req.body;
     const normalizedTitle = title?.trim();
 
     if (!normalizedTitle) {
@@ -194,6 +219,7 @@ export const updateAsset = async (req, res) => {
       visualType,
       existingAsset.visual_type || DEFAULT_VISUAL_TYPE
     );
+    const normalizedStatus = normalizeAssetStatus(status, existingAsset.status || "published");
     const nextImageUrl = req.file
       ? `/uploads/assets/${req.file.filename}`
       : existingAsset.image_url;
@@ -201,11 +227,18 @@ export const updateAsset = async (req, res) => {
     const updatedAssetResult = await pool.query(
       `
       UPDATE assets
-      SET title = $1, description = $2, image_url = $3, visual_type = $4
-      WHERE id = $5
+      SET title = $1, description = $2, image_url = $3, visual_type = $4, status = $5
+      WHERE id = $6
       RETURNING *
       `,
-      [normalizedTitle, description || null, nextImageUrl, normalizedVisualType, assetId]
+      [
+        normalizedTitle,
+        description || null,
+        nextImageUrl,
+        normalizedVisualType,
+        normalizedStatus,
+        assetId
+      ]
     );
 
     if (req.file && existingAsset.image_url?.startsWith("/uploads/")) {

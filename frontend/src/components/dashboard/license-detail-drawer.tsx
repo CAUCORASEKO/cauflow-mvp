@@ -22,6 +22,12 @@ import { LicensePolicyBuilder } from "@/components/dashboard/license-policy-buil
 import { PolicySummaryCard } from "@/components/dashboard/policy-summary-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import {
+  formatCatalogStatus,
+  getCatalogStatusBadgeClassName,
+  getCatalogStatusHelperCopy
+} from "@/lib/catalog-lifecycle";
 import { formatLicenseType, formatLicenseUsage } from "@/lib/license-taxonomy";
 import { formatVisualAssetType } from "@/lib/visual-taxonomy";
 
@@ -49,6 +55,7 @@ export function LicenseDetailDrawer({
   const [type, setType] = useState("");
   const [usage, setUsage] = useState("");
   const [price, setPrice] = useState("");
+  const [status, setStatus] = useState<License["status"]>("published");
   const [policyEnabled, setPolicyEnabled] = useState(false);
   const [policy, setPolicy] = useState<LicensePolicyInput>(DEFAULT_LICENSE_POLICY);
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
@@ -96,6 +103,7 @@ export function LicenseDetailDrawer({
         setType(nextLicense.type);
         setUsage(nextLicense.usage);
         setPrice(String(nextLicense.price));
+        setStatus(nextLicense.status);
         setPolicyEnabled(Boolean(nextLicense.policy));
         setPolicy(getLicensePolicyInput(nextLicense.policy));
       } catch (loadError) {
@@ -160,12 +168,14 @@ export function LicenseDetailDrawer({
         type,
         usage,
         price: Number(price),
+        status,
         policy: policyEnabled ? policy : null
       });
       setLicense(updatedLicense);
       setType(updatedLicense.type);
       setUsage(updatedLicense.usage);
       setPrice(String(updatedLicense.price));
+      setStatus(updatedLicense.status);
       setPolicyEnabled(Boolean(updatedLicense.policy));
       setPolicy(getLicensePolicyInput(updatedLicense.policy));
       setIsEditing(false);
@@ -176,6 +186,42 @@ export function LicenseDetailDrawer({
         submissionError instanceof Error
           ? submissionError.message
           : "Unable to update license"
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleStatusChange = async (nextStatus: License["status"]) => {
+    if (!license || nextStatus === license.status) {
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      setSaveFeedback(null);
+      setSaveError(null);
+      const updatedLicense = await updateLicense(license.id, {
+        type: license.type,
+        usage: license.usage,
+        price: Number(license.price),
+        status: nextStatus,
+        policy: license.policy ? getLicensePolicyInput(license.policy) : null
+      });
+      setLicense(updatedLicense);
+      setType(updatedLicense.type);
+      setUsage(updatedLicense.usage);
+      setPrice(String(updatedLicense.price));
+      setStatus(updatedLicense.status);
+      setPolicyEnabled(Boolean(updatedLicense.policy));
+      setPolicy(getLicensePolicyInput(updatedLicense.policy));
+      setSaveFeedback(`License moved to ${formatCatalogStatus(nextStatus).toLowerCase()}.`);
+      onLicenseUpdated(updatedLicense);
+    } catch (submissionError) {
+      setSaveError(
+        submissionError instanceof Error
+          ? submissionError.message
+          : "Unable to update license lifecycle"
       );
     } finally {
       setIsSaving(false);
@@ -272,6 +318,14 @@ export function LicenseDetailDrawer({
                 </div>
                 <div className="rounded-[22px] border border-white/8 bg-white/[0.025] p-4">
                   <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                    Lifecycle
+                  </p>
+                  <p className="mt-2 text-sm font-medium text-white">
+                    {formatCatalogStatus(license.status)}
+                  </p>
+                </div>
+                <div className="rounded-[22px] border border-white/8 bg-white/[0.025] p-4">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
                     Purchases
                   </p>
                   <p className="mt-2 text-sm font-medium text-white">
@@ -289,6 +343,64 @@ export function LicenseDetailDrawer({
               </div>
 
               <section className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
+                <div className="mb-5 rounded-[22px] border border-white/8 bg-slate-950/45 p-4">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <span
+                        className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getCatalogStatusBadgeClassName(
+                          license.status
+                        )}`}
+                      >
+                        {formatCatalogStatus(license.status)}
+                      </span>
+                      <p className="mt-3 text-sm leading-6 text-slate-300">
+                        {getCatalogStatusHelperCopy(license.status, "This license")}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {license.status !== "published" ? (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          disabled={isSaving}
+                          onClick={() => void handleStatusChange("published")}
+                        >
+                          Publish
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          disabled={isSaving}
+                          onClick={() => void handleStatusChange("draft")}
+                        >
+                          Unpublish
+                        </Button>
+                      )}
+                      {license.status !== "archived" ? (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="border-amber-300/20 bg-amber-300/[0.08] text-amber-100 hover:bg-amber-300/[0.14]"
+                          disabled={isSaving}
+                          onClick={() => void handleStatusChange("archived")}
+                        >
+                          Archive
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          disabled={isSaving}
+                          onClick={() => void handleStatusChange("draft")}
+                        >
+                          Restore
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex items-center gap-2 text-slate-300">
                     <ShieldCheck className="h-4 w-4 text-sky-200" />
@@ -304,6 +416,7 @@ export function LicenseDetailDrawer({
                         setType(license.type);
                         setUsage(license.usage);
                         setPrice(String(license.price));
+                        setStatus(license.status);
                         setPolicyEnabled(Boolean(license.policy));
                         setPolicy(getLicensePolicyInput(license.policy));
                         setSaveError(null);
@@ -317,6 +430,14 @@ export function LicenseDetailDrawer({
 
                 {!isEditing ? (
                   <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                        Lifecycle
+                      </p>
+                      <p className="mt-2 text-sm text-white">
+                        {formatCatalogStatus(license.status)}
+                      </p>
+                    </div>
                     <div>
                       <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
                         Type
@@ -358,6 +479,22 @@ export function LicenseDetailDrawer({
                   </div>
                 ) : (
                   <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-slate-200">Lifecycle</label>
+                      <Select
+                        value={status}
+                        onChange={(event) => setStatus(event.target.value as License["status"])}
+                        required
+                      >
+                        <option value="draft">Draft</option>
+                        <option value="published">Published</option>
+                        <option value="archived">Archived</option>
+                      </Select>
+                      <p className="text-sm leading-6 text-slate-400">
+                        Existing customer rights remain active even when this package is no
+                        longer offered to new buyers.
+                      </p>
+                    </div>
                     <LicenseCommercialFields
                       type={type}
                       usage={usage}
@@ -401,6 +538,7 @@ export function LicenseDetailDrawer({
                           setType(license.type);
                           setUsage(license.usage);
                           setPrice(String(license.price));
+                          setStatus(license.status);
                           setPolicyEnabled(Boolean(license.policy));
                           setPolicy(getLicensePolicyInput(license.policy));
                           setSaveError(null);

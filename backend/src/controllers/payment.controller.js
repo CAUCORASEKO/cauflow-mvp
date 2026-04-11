@@ -26,6 +26,7 @@ const getCheckoutOffering = async (db, { assetId, packId, licenseId }) => {
         l.type AS license_type,
         l.price AS license_price,
         l.usage AS license_usage,
+        l.status AS license_status,
         l.owner_user_id AS license_owner_user_id
       FROM packs p
       LEFT JOIN licenses l
@@ -43,7 +44,7 @@ const getCheckoutOffering = async (db, { assetId, packId, licenseId }) => {
     const pack = result.rows[0];
 
     if (pack.pack_status !== "published") {
-      throw new Error("This pack is not currently available for licensing");
+      throw new Error("This pack is no longer available in the marketplace");
     }
 
     if (!pack.license_id) {
@@ -51,6 +52,10 @@ const getCheckoutOffering = async (db, { assetId, packId, licenseId }) => {
     }
 
     if (pack.pack_license_id !== Number(licenseId)) {
+      throw new Error("The selected pack license is no longer available");
+    }
+
+    if (pack.license_status !== "published") {
       throw new Error("The selected pack license is no longer available");
     }
 
@@ -77,12 +82,14 @@ const getCheckoutOffering = async (db, { assetId, packId, licenseId }) => {
       a.id AS asset_id,
       a.title AS asset_title,
       a.description AS asset_description,
+      a.status AS asset_status,
       a.owner_user_id AS asset_owner_user_id,
       l.id AS license_id,
       l.asset_id AS license_asset_id,
       l.type AS license_type,
       l.price AS license_price,
       l.usage AS license_usage,
+      l.status AS license_status,
       l.owner_user_id AS license_owner_user_id
     FROM licenses l
     JOIN assets a
@@ -101,6 +108,10 @@ const getCheckoutOffering = async (db, { assetId, packId, licenseId }) => {
 
   if (assetId && assetLicense.asset_id !== Number(assetId)) {
     throw new Error("The selected license does not belong to this asset");
+  }
+
+  if (assetLicense.asset_status !== "published" || assetLicense.license_status !== "published") {
+    throw new Error("This visual asset is no longer available for licensing");
   }
 
   return {

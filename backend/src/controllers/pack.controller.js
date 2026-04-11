@@ -2,7 +2,7 @@ import { pool } from "../config/db.js";
 import { normalizeResponseData } from "../utils/normalize-response.js";
 import { buildPackDeleteBlockMessage } from "../utils/delete-constraints.js";
 
-const PACK_STATUSES = new Set(["draft", "published"]);
+const PACK_STATUSES = new Set(["draft", "published", "archived"]);
 const PACK_CATEGORIES = new Set([
   "photography",
   "illustration",
@@ -67,7 +67,7 @@ const validatePackInput = async (db, input, user) => {
   }
 
   if (!PACK_STATUSES.has(status)) {
-    throw new Error("status must be one of: draft, published");
+    throw new Error("status must be one of: draft, published, archived");
   }
 
   if (!PACK_CATEGORIES.has(category)) {
@@ -185,6 +185,7 @@ const fetchPackById = async (db, packId) => {
             a.description,
             a.image_url,
             a.visual_type,
+            a.status,
             a.created_at
           FROM assets a
           WHERE a.id = p.cover_asset_id
@@ -199,6 +200,7 @@ const fetchPackById = async (db, packId) => {
             l.type,
             l.price,
             l.usage,
+            l.status,
             l.created_at,
             (
               SELECT row_to_json(lp)
@@ -239,6 +241,7 @@ const fetchPackById = async (db, packId) => {
         a.description,
         a.image_url,
         a.visual_type,
+        a.status,
         a.created_at
       FROM assets a
       WHERE a.id = pa.asset_id
@@ -351,6 +354,7 @@ export const getPacks = async (req, res) => {
               a.description,
               a.image_url,
               a.visual_type,
+              a.status,
               a.created_at
             FROM assets a
             WHERE a.id = p.cover_asset_id
@@ -365,6 +369,7 @@ export const getPacks = async (req, res) => {
               l.type,
               l.price,
               l.usage,
+              l.status,
               l.created_at,
               (
                 SELECT row_to_json(lp)
@@ -379,7 +384,11 @@ export const getPacks = async (req, res) => {
           ) AS base_license
         ) AS license
       FROM packs p
-      ${req.user?.role === "creator" ? "WHERE p.owner_user_id = $1" : ""}
+      ${
+        req.user?.role === "creator"
+          ? "WHERE p.owner_user_id = $1"
+          : "WHERE p.status = 'published'"
+      }
       ORDER BY p.created_at DESC, p.id DESC
       `,
       req.user?.role === "creator" ? [req.user.id] : []
@@ -402,7 +411,19 @@ export const getPackById = async (req, res) => {
     const packId = Number(req.params.id);
     const pack = await fetchPackById(pool, packId);
 
-    if (!pack || (req.user?.role === "creator" && pack.owner_user_id !== req.user.id)) {
+    if (!pack) {
+      return res.status(404).json({
+        message: "Pack not found"
+      });
+    }
+
+    if (req.user?.role === "creator" && pack.owner_user_id !== req.user.id) {
+      return res.status(404).json({
+        message: "Pack not found"
+      });
+    }
+
+    if (req.user?.role !== "creator" && pack.status !== "published") {
       return res.status(404).json({
         message: "Pack not found"
       });

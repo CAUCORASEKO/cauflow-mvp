@@ -4,6 +4,7 @@ import { formatLicenseType, formatLicenseUsage } from "@/lib/license-taxonomy";
 import { getLicensePolicyBadges, getLicensePolicyInput } from "@/lib/license-policy";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
+import { formatCatalogStatus, getCatalogStatusBadgeClassName } from "@/lib/catalog-lifecycle";
 
 export function LicenseList({
   licenses,
@@ -71,6 +72,13 @@ export function LicenseList({
                   <span className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-400 transition-colors duration-200">
                     #{license.id}
                   </span>
+                  <span
+                    className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] ${getCatalogStatusBadgeClassName(
+                      license.status
+                    )}`}
+                  >
+                    {formatCatalogStatus(license.status)}
+                  </span>
                 </div>
                 <p className="mt-2 text-sm text-slate-400">
                   {formatLicenseType(license.type)} license for {formatLicenseUsage(license.usage)}
@@ -96,8 +104,12 @@ export function LicenseList({
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-3 text-left md:justify-end md:text-right">
-                <span className="rounded-full border border-sky-300/15 bg-sky-300/8 px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-sky-100">
-                  Rights package
+                <span
+                  className={`rounded-full border px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] ${getCatalogStatusBadgeClassName(
+                    license.status
+                  )}`}
+                >
+                  {formatCatalogStatus(license.status)}
                 </span>
                 <div>
                   <p className="font-display text-xl text-white">

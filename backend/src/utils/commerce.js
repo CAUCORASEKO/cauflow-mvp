@@ -49,6 +49,7 @@ export const buildPurchaseSelect = (whereClause = "TRUE") => `
       l.type,
       l.price,
       l.usage,
+      l.status,
       l.created_at,
       (
         SELECT row_to_json(lp)
@@ -68,6 +69,7 @@ export const buildPurchaseSelect = (whereClause = "TRUE") => `
       a.description,
       a.image_url,
       a.visual_type,
+      a.status,
       a.created_at,
       a.owner_user_id
     FROM assets a
@@ -160,6 +162,7 @@ export const buildGrantSelect = (whereClause = "TRUE") => `
       l.type,
       l.price,
       l.usage,
+      l.status,
       l.created_at,
       (
         SELECT row_to_json(lp)
@@ -179,6 +182,7 @@ export const buildGrantSelect = (whereClause = "TRUE") => `
       a.description,
       a.image_url,
       a.visual_type,
+      a.status,
       a.created_at,
       a.owner_user_id
     FROM assets a
@@ -235,6 +239,7 @@ export const buildCheckoutSessionSelect = (whereClause = "pr.id = $1") => `
       l.type,
       l.price,
       l.usage,
+      l.status,
       l.created_at,
       (
         SELECT row_to_json(lp)
@@ -254,6 +259,7 @@ export const buildCheckoutSessionSelect = (whereClause = "pr.id = $1") => `
       a.description,
       a.image_url,
       a.visual_type,
+      a.status,
       a.created_at,
       a.owner_user_id
     FROM assets a

@@ -19,12 +19,17 @@ import { getAssetImageUrl, getPackById, updatePack } from "@/services/api";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Asset, License, Pack, PackCategory, PackStatus } from "@/types/api";
 import {
+  formatCatalogStatus,
+  getCatalogStatusBadgeClassName,
+  getCatalogStatusHelperCopy
+} from "@/lib/catalog-lifecycle";
+import {
   formatPackCategory,
   formatVisualAssetType,
   packCategoryOptions as categoryOptions
 } from "@/lib/visual-taxonomy";
 
-const statusOptions: PackStatus[] = ["draft", "published"];
+const statusOptions: PackStatus[] = ["draft", "published", "archived"];
 
 export function PackDetailDrawer({
   packId,
@@ -146,9 +151,57 @@ export function PackDetailDrawer({
     () => assets.filter((asset) => selectedAssetIds.includes(asset.id)),
     [assets, selectedAssetIds]
   );
+  const availableAssets = useMemo(
+    () => assets.filter((asset) => asset.status !== "archived"),
+    [assets]
+  );
+  const availableLicenses = useMemo(
+    () => licenses.filter((license) => license.status !== "archived"),
+    [licenses]
+  );
 
   const coverAsset =
     selectedAssets.find((asset) => asset.id === coverAssetId) || pack?.coverAsset || null;
+
+  const handleLifecycleChange = async (nextStatus: PackStatus) => {
+    if (!pack || nextStatus === pack.status) {
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      setSaveFeedback(null);
+      setSaveError(null);
+      const updatedPack = await updatePack(pack.id, {
+        title: pack.title,
+        description: pack.description,
+        category: pack.category,
+        price: Number(pack.price),
+        status: nextStatus,
+        licenseId: pack.licenseId,
+        coverAssetId: pack.coverAssetId,
+        assetIds: pack.assets?.map((item) => item.assetId) || selectedAssetIds
+      });
+
+      setPack(updatedPack);
+      setTitle(updatedPack.title);
+      setDescription(updatedPack.description);
+      setCategory(updatedPack.category);
+      setPrice(String(updatedPack.price));
+      setStatus(updatedPack.status);
+      setLicenseId(updatedPack.licenseId ? String(updatedPack.licenseId) : "");
+      setSelectedAssetIds(updatedPack.assets?.map((item) => item.assetId) || []);
+      setCoverAssetId(updatedPack.coverAssetId);
+      setSaveFeedback(`Pack moved to ${formatCatalogStatus(nextStatus).toLowerCase()}.`);
+      onPackUpdated(updatedPack);
+    } catch (submissionError) {
+      setSaveError(
+        submissionError instanceof Error ? submissionError.message : "Unable to update pack lifecycle"
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   if (!packId) {
     return null;
@@ -338,8 +391,12 @@ export function PackDetailDrawer({
                     <span className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-400">
                       {formatPackCategory(pack.category)}
                     </span>
-                    <span className="rounded-full border border-emerald-400/20 bg-emerald-400/[0.1] px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-emerald-100">
-                      {pack.status}
+                    <span
+                      className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] ${getCatalogStatusBadgeClassName(
+                        pack.status
+                      )}`}
+                    >
+                      {formatCatalogStatus(pack.status)}
                     </span>
                   </div>
                   <h4 className="mt-4 font-display text-[2rem] text-white">{pack.title}</h4>
@@ -365,6 +422,13 @@ export function PackDetailDrawer({
               </div>
 
               <div className="flex items-center gap-3">
+                <span
+                  className={`rounded-full border px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] ${getCatalogStatusBadgeClassName(
+                    pack.status
+                  )}`}
+                >
+                  {formatCatalogStatus(pack.status)}
+                </span>
                 <Button
                   type="button"
                   variant="secondary"
@@ -385,6 +449,60 @@ export function PackDetailDrawer({
                   {isDeleting ? "Deleting..." : "Delete pack"}
                 </Button>
               </div>
+
+              <section className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
+                      Lifecycle
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-slate-300">
+                      {getCatalogStatusHelperCopy(pack.status, "This pack")}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {pack.status !== "published" ? (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={isSaving}
+                        onClick={() => void handleLifecycleChange("published")}
+                      >
+                        Publish
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={isSaving}
+                        onClick={() => void handleLifecycleChange("draft")}
+                      >
+                        Unpublish
+                      </Button>
+                    )}
+                    {pack.status !== "archived" ? (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="border-amber-300/20 bg-amber-300/[0.08] text-amber-100 hover:bg-amber-300/[0.14]"
+                        disabled={isSaving}
+                        onClick={() => void handleLifecycleChange("archived")}
+                      >
+                        Archive
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        disabled={isSaving}
+                        onClick={() => void handleLifecycleChange("draft")}
+                      >
+                        Restore
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </section>
 
               {isEditing ? (
                 <form className="space-y-5" onSubmit={handleSubmit}>
@@ -448,7 +566,7 @@ export function PackDetailDrawer({
                         >
                           {statusOptions.map((option) => (
                             <option key={option} value={option}>
-                              {option}
+                              {formatCatalogStatus(option)}
                             </option>
                           ))}
                         </Select>
@@ -471,9 +589,9 @@ export function PackDetailDrawer({
                           onChange={(event) => setLicenseId(event.target.value)}
                         >
                           <option value="">No base license</option>
-                          {licenses.map((license) => (
+                          {availableLicenses.map((license) => (
                             <option key={license.id} value={license.id}>
-                              {formatLicenseType(license.type)} · #{license.id}
+                              {formatLicenseType(license.type)} · #{license.id} · {formatCatalogStatus(license.status)}
                             </option>
                           ))}
                         </Select>
@@ -482,7 +600,7 @@ export function PackDetailDrawer({
                   </section>
 
                   <PackAssetPicker
-                    assets={assets}
+                    assets={availableAssets}
                     selectedAssetIds={selectedAssetIds}
                     coverAssetId={coverAssetId}
                     onToggleAsset={handleToggleAsset}
@@ -494,7 +612,18 @@ export function PackDetailDrawer({
                     <Button
                       type="button"
                       variant="ghost"
-                      onClick={() => setIsEditing(false)}
+                      onClick={() => {
+                        setIsEditing(false);
+                        setTitle(pack.title);
+                        setDescription(pack.description);
+                        setCategory(pack.category);
+                        setPrice(String(pack.price));
+                        setStatus(pack.status);
+                        setLicenseId(pack.licenseId ? String(pack.licenseId) : "");
+                        setSelectedAssetIds(pack.assets?.map((item) => item.assetId) || []);
+                        setCoverAssetId(pack.coverAssetId);
+                        setPickerError(null);
+                      }}
                     >
                       Cancel
                     </Button>

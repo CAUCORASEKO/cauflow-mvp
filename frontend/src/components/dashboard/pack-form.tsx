@@ -13,12 +13,13 @@ import { formatLicenseType } from "@/lib/license-taxonomy";
 import { formatCurrency } from "@/lib/utils";
 import { createPack } from "@/services/api";
 import type { Asset, License, Pack, PackCategory, PackStatus } from "@/types/api";
+import { formatCatalogStatus } from "@/lib/catalog-lifecycle";
 import {
   formatPackCategory,
   packCategoryOptions as categoryOptions
 } from "@/lib/visual-taxonomy";
 
-const statusOptions: PackStatus[] = ["draft", "published"];
+const statusOptions: PackStatus[] = ["draft", "published", "archived"];
 
 export function PackForm({
   assets,
@@ -58,6 +59,14 @@ export function PackForm({
   const selectedAssets = useMemo(
     () => assets.filter((asset) => selectedAssetIds.includes(asset.id)),
     [assets, selectedAssetIds]
+  );
+  const availableAssets = useMemo(
+    () => assets.filter((asset) => asset.status !== "archived"),
+    [assets]
+  );
+  const availableLicenses = useMemo(
+    () => licenses.filter((license) => license.status !== "archived"),
+    [licenses]
   );
 
   const selectedCoverAsset =
@@ -228,7 +237,7 @@ export function PackForm({
               >
                 {statusOptions.map((option) => (
                   <option key={option} value={option}>
-                    {option}
+                    {formatCatalogStatus(option)}
                   </option>
                 ))}
               </Select>
@@ -248,9 +257,9 @@ export function PackForm({
               <label className="text-sm font-medium text-slate-100">Base license</label>
               <Select value={licenseId} onChange={(event) => setLicenseId(event.target.value)}>
                 <option value="">No base license</option>
-                {licenses.map((license) => (
+                {availableLicenses.map((license) => (
                   <option key={license.id} value={license.id}>
-                    {formatLicenseType(license.type)} · #{license.id}
+                    {formatLicenseType(license.type)} · #{license.id} · {formatCatalogStatus(license.status)}
                   </option>
                 ))}
               </Select>
@@ -267,7 +276,7 @@ export function PackForm({
         >
           <div className="-mt-1">
             <PackAssetPicker
-              assets={assets}
+              assets={availableAssets}
               selectedAssetIds={selectedAssetIds}
               coverAssetId={coverAssetId}
               onToggleAsset={handleToggleAsset}
