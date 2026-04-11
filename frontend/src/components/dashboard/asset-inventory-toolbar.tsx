@@ -1,7 +1,12 @@
 import { Grid2X2, List, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  CatalogStatusFilter,
+  type CatalogFilterValue
+} from "@/components/dashboard/catalog-status-filter";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import type { CatalogStatus } from "@/types/api";
 
 export type AssetImageFilter = "all" | "with-image" | "without-image";
 export type AssetSortOrder = "newest" | "oldest";
@@ -14,6 +19,9 @@ export function AssetInventoryToolbar({
   onImageFilterChange,
   sortOrder,
   onSortOrderChange,
+  statusFilter,
+  onStatusFilterChange,
+  statusCounts,
   viewMode,
   onViewModeChange,
   filteredCount,
@@ -25,6 +33,9 @@ export function AssetInventoryToolbar({
   onImageFilterChange: (value: AssetImageFilter) => void;
   sortOrder: AssetSortOrder;
   onSortOrderChange: (value: AssetSortOrder) => void;
+  statusFilter: CatalogFilterValue;
+  onStatusFilterChange: (value: CatalogFilterValue) => void;
+  statusCounts: Record<CatalogStatus, number>;
   viewMode: AssetViewMode;
   onViewModeChange: (value: AssetViewMode) => void;
   filteredCount: number;
@@ -103,11 +114,18 @@ export function AssetInventoryToolbar({
               onSearchQueryChange("");
               onImageFilterChange("all");
               onSortOrderChange("newest");
+              onStatusFilterChange("all");
             }}
           >
             Reset filters
           </Button>
         </div>
+
+        <CatalogStatusFilter
+          value={statusFilter}
+          onChange={onStatusFilterChange}
+          counts={statusCounts}
+        />
       </div>
     </div>
   );

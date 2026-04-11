@@ -13,7 +13,9 @@ export function AssetsGrid({
   purchases,
   viewMode,
   selectedAssetId,
+  statusActionAssetId,
   onSelectAsset,
+  onStatusAction,
   onDeleteAsset
 }: {
   assets: Asset[];
@@ -21,7 +23,9 @@ export function AssetsGrid({
   purchases: Purchase[];
   viewMode: AssetViewMode;
   selectedAssetId: number | null;
+  statusActionAssetId: number | null;
   onSelectAsset: (asset: Asset) => void;
+  onStatusAction: (asset: Asset) => void;
   onDeleteAsset: (asset: Asset) => void;
 }) {
   const licenseCountByAssetId = new Map<number, number>();
@@ -55,8 +59,21 @@ export function AssetsGrid({
       {assets.map((asset) => {
         const imageUrl = getAssetImageUrl(asset.imageUrl);
         const isSelected = selectedAssetId === asset.id;
+        const isUpdatingStatus = statusActionAssetId === asset.id;
         const licenseCount = licenseCountByAssetId.get(asset.id) || 0;
         const purchaseCount = purchaseCountByAssetId.get(asset.id) || 0;
+        const quickActionLabel =
+          asset.status === "published"
+            ? "Unpublish"
+            : asset.status === "archived"
+              ? "Restore"
+              : "Publish";
+        const quickActionClassName =
+          asset.status === "published"
+            ? "border-white/10 bg-white/[0.04] text-slate-100 hover:bg-white/[0.08]"
+            : asset.status === "archived"
+              ? "border-amber-300/15 bg-amber-300/[0.08] text-amber-100 hover:bg-amber-300/[0.12]"
+              : "border-emerald-400/15 bg-emerald-400/[0.08] text-emerald-100 hover:bg-emerald-400/[0.12]";
 
         return (
           <Card
@@ -160,6 +177,14 @@ export function AssetsGrid({
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
+                        className={`focus-ring inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] transition-all duration-300 ${quickActionClassName}`}
+                        onClick={() => onStatusAction(asset)}
+                        disabled={isUpdatingStatus}
+                      >
+                        {isUpdatingStatus ? "Updating..." : quickActionLabel}
+                      </button>
+                      <button
+                        type="button"
                         className="focus-ring inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-white transition-all duration-300 hover:bg-white/[0.08]"
                         onClick={() => onSelectAsset(asset)}
                       >
@@ -230,6 +255,14 @@ export function AssetsGrid({
                 </button>
 
                 <div className="flex flex-col items-start gap-2 md:items-end">
+                  <button
+                    type="button"
+                    className={`focus-ring inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] transition ${quickActionClassName}`}
+                    onClick={() => onStatusAction(asset)}
+                    disabled={isUpdatingStatus}
+                  >
+                    {isUpdatingStatus ? "Updating..." : quickActionLabel}
+                  </button>
                   <button
                     type="button"
                     className="focus-ring inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-white transition hover:bg-white/[0.08]"

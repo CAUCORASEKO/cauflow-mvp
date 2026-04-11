@@ -3,7 +3,6 @@ import type { Asset, License, Purchase } from "@/types/api";
 import { formatLicenseType, formatLicenseUsage } from "@/lib/license-taxonomy";
 import { getLicensePolicyBadges, getLicensePolicyInput } from "@/lib/license-policy";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { Card } from "@/components/ui/card";
 import { formatCatalogStatus, getCatalogStatusBadgeClassName } from "@/lib/catalog-lifecycle";
 
 export function LicenseList({
@@ -11,14 +10,18 @@ export function LicenseList({
   assets,
   purchases,
   selectedLicenseId,
+  statusActionLicenseId,
   onSelectLicense,
+  onStatusAction,
   onDeleteLicense
 }: {
   licenses: License[];
   assets: Asset[];
   purchases: Purchase[];
   selectedLicenseId: number | null;
+  statusActionLicenseId: number | null;
   onSelectLicense: (license: License) => void;
+  onStatusAction: (license: License) => void;
   onDeleteLicense: (license: License) => void;
 }) {
   const assetMap = new Map(assets.map((asset) => [asset.id, asset.title]));
@@ -32,28 +35,28 @@ export function LicenseList({
   }
 
   return (
-    <Card className="surface-highlight p-6">
-      <div className="mb-5 flex items-center justify-between">
-        <div>
-          <h3 className="font-display text-2xl text-white">Licenses</h3>
-          <p className="text-sm text-slate-400">
-            Structured rights available for purchase.
-          </p>
-        </div>
-        <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-slate-400">
-          {licenses.length} total
-        </span>
-      </div>
+    <div className="space-y-3">
+      {licenses.map((license) => {
+        const isSelected = selectedLicenseId === license.id;
+        const isUpdatingStatus = statusActionLicenseId === license.id;
+        const purchaseCount = purchaseCountByLicenseId.get(license.id) || 0;
+        const policyBadges = license.policy
+          ? getLicensePolicyBadges(getLicensePolicyInput(license.policy)).slice(0, 3)
+          : [];
+        const quickActionLabel =
+          license.status === "published"
+            ? "Unpublish"
+            : license.status === "archived"
+              ? "Restore"
+              : "Publish";
+        const quickActionClassName =
+          license.status === "published"
+            ? "border-white/10 bg-white/[0.04] text-slate-100 hover:bg-white/[0.08]"
+            : license.status === "archived"
+              ? "border-amber-300/15 bg-amber-300/[0.08] text-amber-100 hover:bg-amber-300/[0.12]"
+              : "border-emerald-400/15 bg-emerald-400/[0.08] text-emerald-100 hover:bg-emerald-400/[0.12]";
 
-      <div className="space-y-3">
-        {licenses.map((license) => {
-          const isSelected = selectedLicenseId === license.id;
-          const purchaseCount = purchaseCountByLicenseId.get(license.id) || 0;
-          const policyBadges = license.policy
-            ? getLicensePolicyBadges(getLicensePolicyInput(license.policy)).slice(0, 3)
-            : [];
-
-          return (
+        return (
           <div
             key={license.id}
             tabIndex={0}
@@ -122,6 +125,14 @@ export function LicenseList({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
+                    className={`focus-ring inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] transition ${quickActionClassName}`}
+                    onClick={() => onStatusAction(license)}
+                    disabled={isUpdatingStatus}
+                  >
+                    {isUpdatingStatus ? "Updating..." : quickActionLabel}
+                  </button>
+                  <button
+                    type="button"
                     className="focus-ring inline-flex items-center gap-2 rounded-full border border-sky-300/15 bg-sky-300/8 px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-sky-100 transition hover:bg-sky-300/14"
                     onClick={() => onSelectLicense(license)}
                   >
@@ -148,8 +159,8 @@ export function LicenseList({
               </div>
             </div>
           </div>
-        )})}
-      </div>
-    </Card>
+        );
+      })}
+    </div>
   );
 }

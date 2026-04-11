@@ -21,6 +21,10 @@ import { AssetDetailDrawer } from "@/components/dashboard/asset-detail-drawer";
 import { AssetLoadingState } from "@/components/dashboard/asset-loading-state";
 import { AssetUploadForm } from "@/components/dashboard/asset-upload-form";
 import { AssetsGrid } from "@/components/dashboard/assets-grid";
+import {
+  CatalogStatusFilter,
+  type CatalogFilterValue
+} from "@/components/dashboard/catalog-status-filter";
 import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
 import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
 import { LicenseForm } from "@/components/dashboard/license-form";
@@ -42,10 +46,13 @@ import {
   fetchAssets,
   fetchLicenses,
   fetchPurchases,
-  getPacks
+  getPacks,
+  updateAsset,
+  updateLicense
 } from "@/services/api";
+import { formatCatalogStatus } from "@/lib/catalog-lifecycle";
 import { formatCurrency } from "@/lib/utils";
-import type { Asset, License, Pack, Purchase } from "@/types/api";
+import type { Asset, CatalogStatus, License, Pack, Purchase } from "@/types/api";
 
 type WorkspaceSection = "assets" | "packs" | "licenses";
 
@@ -113,14 +120,19 @@ export function DashboardPage() {
   const [sortOrder, setSortOrder] = useState<AssetSortOrder>("newest");
   const [viewMode, setViewMode] = useState<AssetViewMode>("grid");
   const [selectedAssetId, setSelectedAssetId] = useState<number | null>(null);
+  const [assetStatusActionId, setAssetStatusActionId] = useState<number | null>(null);
   const [assetPendingDelete, setAssetPendingDelete] = useState<Asset | null>(null);
   const [isDeletingAsset, setIsDeletingAsset] = useState(false);
   const [selectedLicenseId, setSelectedLicenseId] = useState<number | null>(null);
+  const [licenseStatusActionId, setLicenseStatusActionId] = useState<number | null>(null);
   const [licensePendingDelete, setLicensePendingDelete] = useState<License | null>(null);
   const [isDeletingLicense, setIsDeletingLicense] = useState(false);
   const [selectedPackId, setSelectedPackId] = useState<number | null>(null);
   const [packPendingDelete, setPackPendingDelete] = useState<Pack | null>(null);
   const [isDeletingPack, setIsDeletingPack] = useState(false);
+  const [assetStatusFilter, setAssetStatusFilter] = useState<CatalogFilterValue>("all");
+  const [packStatusFilter, setPackStatusFilter] = useState<CatalogFilterValue>("all");
+  const [licenseStatusFilter, setLicenseStatusFilter] = useState<CatalogFilterValue>("all");
   const [activeSection, setActiveSection] = useState<WorkspaceSection>(() =>
     typeof window === "undefined" ? "assets" : resolveWorkspaceSection(window.location.hash)
   );
@@ -249,6 +261,8 @@ export function DashboardPage() {
 
     return [...assets]
       .filter((asset) => {
+        const matchesStatus =
+          assetStatusFilter === "all" || asset.status === assetStatusFilter;
         const matchesSearch =
           !normalizedQuery ||
           asset.title.toLowerCase().includes(normalizedQuery) ||
@@ -259,7 +273,7 @@ export function DashboardPage() {
           (imageFilter === "with-image" && Boolean(asset.imageUrl)) ||
           (imageFilter === "without-image" && !asset.imageUrl);
 
-        return matchesSearch && matchesImageFilter;
+        return matchesStatus && matchesSearch && matchesImageFilter;
       })
       .sort((left, right) => {
         const leftTimestamp = new Date(left.createdAt).getTime();
@@ -269,7 +283,41 @@ export function DashboardPage() {
           ? rightTimestamp - leftTimestamp
           : leftTimestamp - rightTimestamp;
       });
-  }, [assets, imageFilter, searchQuery, sortOrder]);
+  }, [assetStatusFilter, assets, imageFilter, searchQuery, sortOrder]);
+
+  const filteredPacks = useMemo(
+    () =>
+      packs.filter((pack) => packStatusFilter === "all" || pack.status === packStatusFilter),
+    [packStatusFilter, packs]
+  );
+
+  const filteredLicenses = useMemo(
+    () =>
+      licenses.filter(
+        (license) =>
+          licenseStatusFilter === "all" || license.status === licenseStatusFilter
+      ),
+    [licenseStatusFilter, licenses]
+  );
+
+  const getStatusCounts = useCallback(
+    <T extends { status: CatalogStatus }>(items: T[]) =>
+      items.reduce(
+        (counts, item) => {
+          counts[item.status] += 1;
+          return counts;
+        },
+        { draft: 0, published: 0, archived: 0 } as Record<CatalogStatus, number>
+      ),
+    []
+  );
+
+  const assetStatusCounts = useMemo(() => getStatusCounts(assets), [assets, getStatusCounts]);
+  const packStatusCounts = useMemo(() => getStatusCounts(packs), [getStatusCounts, packs]);
+  const licenseStatusCounts = useMemo(
+    () => getStatusCounts(licenses),
+    [getStatusCounts, licenses]
+  );
 
   const handleAssetCreated = useCallback((asset: Asset) => {
     setAssets((currentAssets) => [asset, ...currentAssets]);
@@ -374,6 +422,43 @@ export function DashboardPage() {
     }
   }, [assetPendingDelete, loadDashboard]);
 
+  const handleAssetStatusAction = useCallback(async (asset: Asset) => {
+    const nextStatus: Asset["status"] =
+      asset.status === "published"
+        ? "draft"
+        : asset.status === "archived"
+          ? "draft"
+          : "published";
+
+    try {
+      setAssetStatusActionId(asset.id);
+      const updatedAsset = await updateAsset(asset.id, {
+        title: asset.title,
+        description: asset.description || "",
+        visualType: asset.visualType,
+        status: nextStatus
+      });
+      handleAssetUpdated(updatedAsset);
+      setWorkspaceNotice({
+        tone: "success",
+        message: `${asset.title} moved to ${formatCatalogStatus(nextStatus)}`,
+        detail:
+          nextStatus === "published"
+            ? "The asset is now visible in active marketplace flows."
+            : "The asset is now hidden from buyer-facing marketplace availability."
+      });
+    } catch (statusError) {
+      setWorkspaceNotice({
+        tone: "error",
+        message:
+          statusError instanceof Error ? statusError.message : "Unable to update asset status",
+        detail: "Open the asset drawer if you need to review the full lifecycle controls."
+      });
+    } finally {
+      setAssetStatusActionId(null);
+    }
+  }, [handleAssetUpdated]);
+
   const handleLicenseUpdated = useCallback((updatedLicense: License) => {
     setLicenses((currentLicenses) =>
       currentLicenses.map((license) =>
@@ -425,6 +510,44 @@ export function DashboardPage() {
       setIsDeletingLicense(false);
     }
   }, [licensePendingDelete, loadDashboard]);
+
+  const handleLicenseStatusAction = useCallback(async (license: License) => {
+    const nextStatus: License["status"] =
+      license.status === "published"
+        ? "draft"
+        : license.status === "archived"
+          ? "draft"
+          : "published";
+
+    try {
+      setLicenseStatusActionId(license.id);
+      const updatedLicense = await updateLicense(license.id, {
+        type: license.type,
+        price: Number(license.price),
+        usage: license.usage,
+        status: nextStatus,
+        policy: license.policy || undefined
+      });
+      handleLicenseUpdated(updatedLicense);
+      setWorkspaceNotice({
+        tone: "success",
+        message: `License moved to ${formatCatalogStatus(nextStatus)}`,
+        detail:
+          nextStatus === "published"
+            ? "The rights package is available for new buyer activity."
+            : "Existing grants remain intact while new buyer activity stays paused."
+      });
+    } catch (statusError) {
+      setWorkspaceNotice({
+        tone: "error",
+        message:
+          statusError instanceof Error ? statusError.message : "Unable to update license status",
+        detail: "Open the license drawer if you need to review the full lifecycle controls."
+      });
+    } finally {
+      setLicenseStatusActionId(null);
+    }
+  }, [handleLicenseUpdated]);
 
   const handleDeletePack = useCallback(async () => {
     if (!packPendingDelete) {
@@ -526,8 +649,11 @@ export function DashboardPage() {
       : "This action removes the pack and its bundle structure from the catalog. Existing assets and licenses will stay intact.";
   }, [packPendingDelete, purchases]);
 
-  const hasSearchFilters =
-    searchQuery.trim().length > 0 || imageFilter !== "all" || sortOrder !== "newest";
+  const hasAssetFilters =
+    searchQuery.trim().length > 0 ||
+    imageFilter !== "all" ||
+    sortOrder !== "newest" ||
+    assetStatusFilter !== "all";
 
   const activeWorkflowStep =
     purchases.length > 0 ? 3 : licenses.length > 0 ? 2 : packs.length > 0 ? 1 : 0;
@@ -710,6 +836,9 @@ export function DashboardPage() {
               onImageFilterChange={setImageFilter}
               sortOrder={sortOrder}
               onSortOrderChange={setSortOrder}
+              statusFilter={assetStatusFilter}
+              onStatusFilterChange={setAssetStatusFilter}
+              statusCounts={assetStatusCounts}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
               filteredCount={filteredAssets.length}
@@ -733,17 +862,29 @@ export function DashboardPage() {
                 purchases={purchases}
                 viewMode={viewMode}
                 selectedAssetId={selectedAssetId}
+                statusActionAssetId={assetStatusActionId}
                 onSelectAsset={(asset) => setSelectedAssetId(asset.id)}
+                onStatusAction={(asset) => void handleAssetStatusAction(asset)}
                 onDeleteAsset={(asset) => setAssetPendingDelete(asset)}
               />
             ) : (
               <DashboardEmptyState
                 icon={SearchX}
-                eyebrow="No matches"
-                title="No assets match the current search and filter set"
-                copy="Adjust the search query, image filter, or sort controls to bring more of the catalog back into view."
+                eyebrow={
+                  assetStatusFilter === "all" ? "No matches" : `${formatCatalogStatus(assetStatusFilter)} filter`
+                }
+                title={
+                  assetStatusFilter === "all"
+                    ? "No assets match the current search and filter set"
+                    : `No ${formatCatalogStatus(assetStatusFilter).toLowerCase()} assets yet`
+                }
+                copy={
+                  assetStatusFilter === "all"
+                    ? "Adjust the search query, image filter, or sort controls to bring more of the catalog back into view."
+                    : `This view only shows ${formatCatalogStatus(assetStatusFilter).toLowerCase()} assets. Change the filter or update item status from the asset drawer to repopulate it.`
+                }
                 hint={
-                  hasSearchFilters
+                  hasAssetFilters
                     ? "Reset filters to restore the full inventory"
                     : "Try another title or description keyword"
                 }
@@ -769,6 +910,12 @@ export function DashboardPage() {
           />
 
           <div className="mt-8 space-y-6">
+            <CatalogStatusFilter
+              value={packStatusFilter}
+              onChange={setPackStatusFilter}
+              counts={packStatusCounts}
+            />
+
             {loading ? (
               <PanelLoadingState title="packs" />
             ) : assets.length === 0 ? (
@@ -779,12 +926,26 @@ export function DashboardPage() {
                 copy="Packs turn existing inventory into a polished commercial product, so the asset catalog needs at least one record before bundling can begin."
                 hint="Seed the asset inventory first, then return here to package it"
               />
-            ) : packs.length > 0 ? (
+            ) : filteredPacks.length > 0 ? (
               <PackList
-                packs={packs}
+                packs={filteredPacks}
                 selectedPackId={selectedPackId}
                 onSelectPack={(pack) => setSelectedPackId(pack.id)}
                 onDeletePack={(pack) => setPackPendingDelete(pack)}
+              />
+            ) : packs.length > 0 ? (
+              <DashboardEmptyState
+                icon={Box}
+                eyebrow={`${formatCatalogStatus(packStatusFilter).toLowerCase()} packs`}
+                title={
+                  packStatusFilter === "published"
+                    ? "No published packs available"
+                    : packStatusFilter === "draft"
+                      ? "No draft packs yet"
+                      : "No archived packs"
+                }
+                copy="Change the lifecycle filter or update pack status from the detail drawer to manage what stays live, paused, or retained for history."
+                hint="Use the pack detail drawer to publish, unpublish, archive, or restore"
               />
             ) : (
               <DashboardEmptyState
@@ -802,21 +963,55 @@ export function DashboardPage() {
       <section id="licenses" className="scroll-mt-6">
         <div className="grid gap-5 xl:grid-cols-[minmax(320px,0.82fr),minmax(0,1.18fr)] 2xl:grid-cols-[390px,minmax(0,1fr)]">
           <div className="xl:sticky xl:top-4 xl:self-start">
-          <LicenseForm assets={assets} onCreated={handleLicenseCreated} />
+            <LicenseForm assets={assets} onCreated={handleLicenseCreated} />
           </div>
 
           <div className="space-y-6">
             {loading ? (
               <PanelLoadingState title="licenses" />
             ) : licenses.length > 0 ? (
-              <LicenseList
-                licenses={licenses}
-                assets={assets}
-                purchases={purchases}
-                selectedLicenseId={selectedLicenseId}
-                onSelectLicense={(license) => setSelectedLicenseId(license.id)}
-                onDeleteLicense={(license) => setLicensePendingDelete(license)}
-              />
+              <Card className="surface-highlight p-6">
+                <div className="space-y-6">
+                  <SectionHeading
+                    eyebrow="Licenses"
+                    title="Rights catalog"
+                    copy="Filter commercial terms by lifecycle state so you can see what buyers can purchase now, what still needs review, and what you have retained for history."
+                  />
+
+                  <CatalogStatusFilter
+                    value={licenseStatusFilter}
+                    onChange={setLicenseStatusFilter}
+                    counts={licenseStatusCounts}
+                  />
+
+                  {filteredLicenses.length > 0 ? (
+                    <LicenseList
+                      licenses={filteredLicenses}
+                      assets={assets}
+                      purchases={purchases}
+                      selectedLicenseId={selectedLicenseId}
+                      statusActionLicenseId={licenseStatusActionId}
+                      onSelectLicense={(license) => setSelectedLicenseId(license.id)}
+                      onStatusAction={(license) => void handleLicenseStatusAction(license)}
+                      onDeleteLicense={(license) => setLicensePendingDelete(license)}
+                    />
+                  ) : (
+                    <DashboardEmptyState
+                      icon={ShieldCheck}
+                      eyebrow={`${formatCatalogStatus(licenseStatusFilter).toLowerCase()} licenses`}
+                      title={
+                        licenseStatusFilter === "published"
+                          ? "No published licenses available"
+                          : licenseStatusFilter === "draft"
+                            ? "No draft licenses yet"
+                            : "No archived licenses"
+                      }
+                      copy="Adjust the lifecycle filter or update a rights package status to bring the relevant commercial records back into view."
+                      hint="Use quick actions or open a license detail drawer for full lifecycle control"
+                    />
+                  )}
+                </div>
+              </Card>
             ) : (
               <Card className="p-6">
                 <DashboardEmptyState
