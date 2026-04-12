@@ -181,8 +181,17 @@ export const buildGrantSelect = (whereClause = "TRUE") => `
       a.title,
       a.description,
       a.image_url,
+      a.preview_image_url,
       a.visual_type,
       a.status,
+      a.master_file_url,
+      a.master_file_name,
+      a.master_mime_type,
+      a.master_file_size,
+      a.master_width,
+      a.master_height,
+      a.master_aspect_ratio,
+      a.master_resolution_summary,
       a.created_at,
       a.owner_user_id
     FROM assets a

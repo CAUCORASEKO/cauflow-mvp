@@ -8,6 +8,7 @@ export type VisualAssetType =
 
 export type CatalogStatus = "draft" | "published" | "archived";
 export type AssetDeliveryStatus = "delivery_ready" | "needs_fixes";
+export type AssetReviewStatus = "draft" | "in_review" | "approved" | "rejected";
 
 export interface AssetFileRecord {
   url: string | null;
@@ -36,6 +37,11 @@ export interface Asset {
   previewFile?: AssetFileRecord | null;
   masterFile?: AssetFileRecord | null;
   deliveryReadiness?: AssetDeliveryReadiness | null;
+  reviewStatus: AssetReviewStatus;
+  reviewNote?: string | null;
+  canPublish?: boolean;
+  publishBlockedReasons?: string[];
+  buyerVisible?: boolean;
   visualType: VisualAssetType;
   status: CatalogStatus;
   createdAt: string;
@@ -236,6 +242,17 @@ export interface LicenseGrant {
   asset?: Asset | null;
   pack?: Pack | null;
   creator?: AccountSummary | null;
+  premiumDelivery?: {
+    eligible: boolean;
+    available: boolean;
+    reason: string | null;
+    downloadUrl: string | null;
+    fileName: string | null;
+    mimeType: string | null;
+    fileSize: number | null;
+    resolutionSummary: string | null;
+    aspectRatio: string | null;
+  } | null;
 }
 
 export interface ExploreFeed {

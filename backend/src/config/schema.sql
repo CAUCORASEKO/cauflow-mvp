@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS assets (
   description TEXT,
   image_url VARCHAR(500),
   visual_type VARCHAR(50) NOT NULL DEFAULT 'photography',
-  status VARCHAR(50) NOT NULL DEFAULT 'published',
+  status VARCHAR(50) NOT NULL DEFAULT 'draft',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -79,7 +79,16 @@ ALTER TABLE assets
 ADD COLUMN IF NOT EXISTS visual_type VARCHAR(50) NOT NULL DEFAULT 'photography';
 
 ALTER TABLE assets
-ADD COLUMN IF NOT EXISTS status VARCHAR(50) NOT NULL DEFAULT 'published';
+ADD COLUMN IF NOT EXISTS status VARCHAR(50) NOT NULL DEFAULT 'draft';
+
+ALTER TABLE assets
+ADD COLUMN IF NOT EXISTS review_status VARCHAR(50) NOT NULL DEFAULT 'draft';
+
+ALTER TABLE assets
+ADD COLUMN IF NOT EXISTS review_note TEXT;
+
+ALTER TABLE assets
+ALTER COLUMN status SET DEFAULT 'draft';
 
 ALTER TABLE assets
 ADD COLUMN IF NOT EXISTS owner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
@@ -143,6 +152,13 @@ WHERE visual_type IS NULL OR trim(visual_type) = '';
 UPDATE assets
 SET status = 'published'
 WHERE status IS NULL OR trim(status) = '';
+
+UPDATE assets
+SET review_status = CASE
+  WHEN status = 'published' THEN 'approved'
+  ELSE 'draft'
+END
+WHERE review_status IS NULL OR trim(review_status) = '';
 
 CREATE TABLE IF NOT EXISTS licenses (
   id SERIAL PRIMARY KEY,

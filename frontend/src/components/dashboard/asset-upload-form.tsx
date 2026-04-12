@@ -119,7 +119,8 @@ export function AssetUploadForm({
             </h3>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
               Register a buyer-facing preview and the original premium file together, so the
-              catalog can distinguish presentation media from future licensed delivery.
+              catalog can distinguish presentation media from future licensed delivery. New assets
+              start in draft and move into review once delivery is technically ready.
             </p>
           </div>
           <div className="hidden h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-sky-200 md:flex">
@@ -143,19 +144,19 @@ export function AssetUploadForm({
       </div>
 
       <div className="p-5 xl:p-6">
-        <form className="space-y-5" onSubmit={handleSubmit}>
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr),320px]">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-200">Asset title</label>
-                <Input
-                  placeholder="Premium campaign stills"
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                  required
-                />
-              </div>
+        <form className="space-y-6" onSubmit={handleSubmit}>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-200">Asset title</label>
+              <Input
+                placeholder="Premium campaign stills"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                required
+              />
+            </div>
 
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr),minmax(260px,0.72fr)]">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-200">Visual category</label>
                 <Select
@@ -186,64 +187,69 @@ export function AssetUploadForm({
                   {getVisualAssetTypeDescription(visualType)}
                 </p>
               </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-200">
-                  Licensing description
-                </label>
-                <Textarea
-                  placeholder="Describe the asset, origin, intended usage, and why it belongs in the licensable catalog."
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                />
-              </div>
             </div>
 
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-200">
+                Licensing description
+              </label>
+              <Textarea
+                className="min-h-36"
+                placeholder="Describe the asset, origin, intended usage, and why it belongs in the licensable catalog."
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr),minmax(300px,0.84fr)]">
             <div className="rounded-[28px] border border-white/10 bg-black/20 p-4">
               <div className="flex items-center gap-2 text-slate-200">
                 <ShieldCheck className="h-4 w-4 text-sky-200" />
                 <p className="text-sm font-medium">Delivery readiness rules</p>
               </div>
-              <p className="mt-3 text-sm leading-6 text-slate-400">{assetDeliveryRulesCopy}</p>
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
+                {assetDeliveryRulesCopy}
+              </p>
+            </div>
 
-              <div className="mt-4 space-y-3">
-                <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
-                    Preview image
-                  </p>
-                  <p className="mt-2 text-sm text-white">
-                    {previewImage ? "Selected" : "Required for new assets"}
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-slate-400">
-                    Shown in workspace and marketplace surfaces.
-                  </p>
-                </div>
-                <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
-                    Master delivery file
-                  </p>
-                  <p className="mt-2 text-sm text-white">
-                    {masterFile ? "Selected" : "Optional now, required for ready status"}
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-slate-400">
-                    Original or premium file reserved for later buyer delivery.
-                  </p>
-                </div>
-                <div className="rounded-[22px] border border-sky-300/12 bg-sky-300/[0.05] p-4">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-sky-100/80">
-                    Supported files
-                  </p>
-                  <p className="mt-2 text-sm text-white">JPG, PNG, or WebP</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-300">
-                    Master files can be larger. Metadata and technical readiness are captured
-                    automatically when you upload.
-                  </p>
-                </div>
+            <div className="grid gap-3 sm:grid-cols-3 2xl:grid-cols-1">
+              <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                  Preview image
+                </p>
+                <p className="mt-2 text-sm text-white">
+                  {previewImage ? "Selected" : "Required for new assets"}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-400">
+                  Shown in workspace and marketplace surfaces.
+                </p>
+              </div>
+              <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                  Master delivery file
+                </p>
+                <p className="mt-2 text-sm text-white">
+                  {masterFile ? "Selected" : "Optional now, required for ready status"}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-400">
+                  Original or premium file reserved for later buyer delivery.
+                </p>
+              </div>
+              <div className="rounded-[22px] border border-sky-300/12 bg-sky-300/[0.05] p-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-sky-100/80">
+                  Supported files
+                </p>
+                <p className="mt-2 text-sm text-white">JPG, PNG, or WebP</p>
+                <p className="mt-2 text-sm leading-6 text-slate-300">
+                  Master files can be larger. Metadata and technical readiness are captured
+                  automatically when you upload.
+                </p>
               </div>
             </div>
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-2">
+          <div className="grid gap-4 2xl:grid-cols-2">
             <label className={`${filePickerClassName} border-white/15 bg-white/[0.025]`}>
               <input
                 type="file"
@@ -289,7 +295,7 @@ export function AssetUploadForm({
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                     Preview image
                   </p>
-                  <p className="mt-1 max-w-[220px] truncate text-sm text-slate-300">
+                  <p className="mt-1 max-w-[320px] truncate text-sm text-slate-300">
                     {previewImage?.name || "No file selected"}
                   </p>
                   <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">
@@ -343,7 +349,7 @@ export function AssetUploadForm({
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                     Master delivery file
                   </p>
-                  <p className="mt-1 max-w-[220px] truncate text-sm text-slate-300">
+                  <p className="mt-1 max-w-[320px] truncate text-sm text-slate-300">
                     {masterFile?.name || "No file selected"}
                   </p>
                   <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">

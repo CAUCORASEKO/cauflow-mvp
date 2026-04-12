@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { LockKeyhole, Package2, ShieldCheck, Sparkles } from "lucide-react";
 import { ActionFeedback } from "@/components/dashboard/action-feedback";
@@ -12,6 +12,7 @@ import { buyerNav } from "@/lib/platform-nav";
 import { formatCurrency, humanizeLabel } from "@/lib/utils";
 import {
   formatPackCategory,
+  getPackVisualDiscipline,
   formatVisualAssetType,
   visualAssetTypeOptions
 } from "@/lib/visual-taxonomy";
@@ -41,6 +42,9 @@ const getCreatorLabel = (creator?: {
 
 const getPurchaseErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : "Unable to start checkout right now";
+
+const getVisualDisciplineLabel = (value: "all" | VisualAssetType) =>
+  value === "all" ? "All visual assets" : humanizeLabel(value);
 
 function ExploreAssetCard({
   asset,
@@ -322,19 +326,31 @@ export function ExplorePage() {
     }
   };
 
-  const filteredAssets =
-    visualTypeFilter === "all"
-      ? feed?.assets || []
-      : (feed?.assets || []).filter((asset) => asset.visualType === visualTypeFilter);
+  const filteredAssets = useMemo(
+    () =>
+      visualTypeFilter === "all"
+        ? feed?.assets || []
+        : (feed?.assets || []).filter((asset) => asset.visualType === visualTypeFilter),
+    [feed?.assets, visualTypeFilter]
+  );
 
-  const filteredPacks =
-    visualTypeFilter === "all"
-      ? feed?.packs || []
-      : (feed?.packs || []).filter(
-          (pack) =>
-            pack.category === visualTypeFilter ||
-            (pack.category === "mixed_visuals" && pack.coverAsset?.visualType === visualTypeFilter)
-        );
+  const filteredPacks = useMemo(
+    () =>
+      visualTypeFilter === "all"
+        ? feed?.packs || []
+        : (feed?.packs || []).filter(
+            (pack) =>
+              getPackVisualDiscipline({
+                category: pack.category,
+                coverVisualType: pack.coverAsset?.visualType
+              }) === visualTypeFilter
+          ),
+    [feed?.packs, visualTypeFilter]
+  );
+
+  const activeDisciplineLabel = getVisualDisciplineLabel(visualTypeFilter);
+  const hasOffersInCurrentFilter =
+    filteredAssets.length > 0 || filteredPacks.length > 0;
 
   const content = (
     <div className="space-y-8">
@@ -384,6 +400,18 @@ export function ExplorePage() {
         </div>
       </section>
 
+      {!hasOffersInCurrentFilter && visualTypeFilter !== "all" ? (
+        <section className="rounded-[28px] border border-white/10 bg-white/[0.03] p-6">
+          <p className="text-[11px] uppercase tracking-[0.24em] text-sky-200">No active offers</p>
+          <h2 className="mt-2 font-display text-2xl text-white">
+            No active offers in {activeDisciplineLabel} right now.
+          </h2>
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-400">
+            Try another visual discipline to review currently published single assets and bundled collections.
+          </p>
+        </section>
+      ) : null}
+
       <section className="space-y-4">
         <div className="flex items-center justify-between gap-4">
           <div>
@@ -394,19 +422,33 @@ export function ExplorePage() {
         </div>
 
         <div className="grid gap-5 xl:grid-cols-2">
-          {filteredAssets.map((asset) => (
-            <ExploreAssetCard
-              key={`asset-${asset.id}`}
-              asset={asset}
-              selectedLicenseId={selectedAssetLicenses[asset.id] || null}
-              onSelectLicense={(licenseId) =>
-                setSelectedAssetLicenses((current) => ({ ...current, [asset.id]: licenseId }))
-              }
-              onCheckout={handleCheckout}
-              pending={pendingLabel === asset.title}
-              user={user}
-            />
-          ))}
+          {filteredAssets.length > 0 ? (
+            filteredAssets.map((asset) => (
+              <ExploreAssetCard
+                key={`asset-${asset.id}`}
+                asset={asset}
+                selectedLicenseId={selectedAssetLicenses[asset.id] || null}
+                onSelectLicense={(licenseId) =>
+                  setSelectedAssetLicenses((current) => ({ ...current, [asset.id]: licenseId }))
+                }
+                onCheckout={handleCheckout}
+                pending={pendingLabel === asset.title}
+                user={user}
+              />
+            ))
+          ) : (
+            <Card className="surface-highlight border border-white/10 bg-white/[0.03] p-6 xl:col-span-2">
+              <p className="text-[11px] uppercase tracking-[0.24em] text-sky-200">Single assets</p>
+              <h3 className="mt-2 font-display text-2xl text-white">
+                {visualTypeFilter === "all"
+                  ? "No single-asset offers right now."
+                  : `No single-asset offers in ${activeDisciplineLabel} right now.`}
+              </h3>
+              <p className="mt-3 text-sm leading-7 text-slate-400">
+                Direct asset licensing is unavailable for this selection at the moment, but bundled collections may still be active below.
+              </p>
+            </Card>
+          )}
         </div>
       </section>
 
@@ -420,15 +462,29 @@ export function ExplorePage() {
         </div>
 
         <div className="grid gap-5 xl:grid-cols-2">
-          {filteredPacks.map((pack) => (
-            <ExplorePackCard
-              key={`pack-${pack.id}`}
-              pack={pack}
-              onCheckout={handleCheckout}
-              pending={pendingLabel === pack.title}
-              user={user}
-            />
-          ))}
+          {filteredPacks.length > 0 ? (
+            filteredPacks.map((pack) => (
+              <ExplorePackCard
+                key={`pack-${pack.id}`}
+                pack={pack}
+                onCheckout={handleCheckout}
+                pending={pendingLabel === pack.title}
+                user={user}
+              />
+            ))
+          ) : (
+            <Card className="surface-highlight border border-white/10 bg-white/[0.03] p-6 xl:col-span-2">
+              <p className="text-[11px] uppercase tracking-[0.24em] text-sky-200">Bundled collections</p>
+              <h3 className="mt-2 font-display text-2xl text-white">
+                {visualTypeFilter === "all"
+                  ? "No bundled collections available right now."
+                  : `No bundled collections in ${activeDisciplineLabel} right now.`}
+              </h3>
+              <p className="mt-3 text-sm leading-7 text-slate-400">
+                Pack offers are filtered by their merchandising category first, with cover-visual fallback support for mixed collections.
+              </p>
+            </Card>
+          )}
         </div>
       </section>
     </div>

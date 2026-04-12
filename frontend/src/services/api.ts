@@ -187,6 +187,33 @@ export const updateAsset = async (
   return handleResponse<Asset>(response);
 };
 
+export const submitAssetForReview = async (assetId: number) => {
+  const response = await fetch(`${API_BASE_URL}/assets/${assetId}/review/submit`, {
+    method: "POST",
+    headers: getAuthHeaders()
+  });
+
+  return handleResponse<Asset>(response);
+};
+
+export const updateAssetReview = async (
+  assetId: number,
+  input: {
+    reviewStatus: Asset["reviewStatus"];
+    reviewNote?: string;
+  }
+) => {
+  const response = await fetch(`${API_BASE_URL}/assets/${assetId}/review`, {
+    method: "PATCH",
+    headers: getAuthHeaders({
+      "Content-Type": "application/json"
+    }),
+    body: JSON.stringify(input)
+  });
+
+  return handleResponse<Asset>(response);
+};
+
 export const fetchLicenses = async () => {
   const response = await fetch(`${API_BASE_URL}/licenses`, {
     headers: getAuthHeaders()
@@ -595,6 +622,39 @@ export const fetchEntitlements = async () => {
   });
 
   return handleResponse<LicenseGrant[]>(response);
+};
+
+export const downloadEntitlementMasterFile = async (grantId: number) => {
+  const response = await fetch(`${API_BASE_URL}/platform/entitlements/${grantId}/download`, {
+    headers: getAuthHeaders()
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json()) as ApiResponse<null>;
+    throw new ApiError(
+      payload.error || payload.message || "Unable to download premium delivery file",
+      response.status,
+      payload.code
+    );
+  }
+
+  const blob = await response.blob();
+  const contentDisposition = response.headers.get("content-disposition") || "";
+  const fileNameMatch =
+    contentDisposition.match(/filename\*=UTF-8''([^;]+)/i) ||
+    contentDisposition.match(/filename=\"?([^"]+)\"?/i);
+  const fileName = fileNameMatch?.[1]
+    ? decodeURIComponent(fileNameMatch[1].replace(/"/g, ""))
+    : `cauflow-master-file-${grantId}`;
+
+  const objectUrl = window.URL.createObjectURL(blob);
+  const link = window.document.createElement("a");
+  link.href = objectUrl;
+  link.download = fileName;
+  window.document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(objectUrl);
 };
 
 export const createCheckoutSession = async (input: {

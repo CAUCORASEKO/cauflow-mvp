@@ -88,3 +88,35 @@ const packCategoryLabels: Record<string, string> = {
 
 export const formatPackCategory = (value: string | null | undefined) =>
   packCategoryLabels[value || "mixed_visuals"] || "Mixed Visuals";
+
+const packCategoryVisualTypeMap: Partial<Record<PackCategory, VisualAssetType>> = {
+  photography: "photography",
+  illustration: "illustration",
+  concept_art: "concept_art",
+  character_design: "character_design",
+  environment: "environment",
+  brand_visual: "brand_visual",
+  concept: "concept_art",
+  character: "character_design",
+  brand: "brand_visual"
+};
+
+export const getPackVisualDiscipline = ({
+  category,
+  coverVisualType
+}: {
+  category: PackCategory | string | null | undefined;
+  coverVisualType?: VisualAssetType | null;
+}) => {
+  const normalizedCategory = (category || "mixed_visuals") as PackCategory;
+
+  if (packCategoryVisualTypeMap[normalizedCategory]) {
+    return packCategoryVisualTypeMap[normalizedCategory] || null;
+  }
+
+  if (normalizedCategory === "mixed_visuals" || normalizedCategory === "mixed") {
+    return coverVisualType || null;
+  }
+
+  return coverVisualType || null;
+};

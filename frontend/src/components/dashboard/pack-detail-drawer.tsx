@@ -363,13 +363,18 @@ export function PackDetailDrawer({
               {saveError ? <ActionFeedback tone="error" message={saveError} /> : null}
 
               <div className="overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.03]">
-                <div className="relative aspect-[2.2/1] border-b border-white/10 bg-slate-900">
+                <div className="relative min-h-[360px] border-b border-white/10 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 sm:min-h-[420px]">
+                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(125,211,252,0.12),transparent_38%),linear-gradient(180deg,rgba(2,6,23,0.2),rgba(2,6,23,0.68))]" />
                   {getAssetImageUrl(coverAsset?.imageUrl || null) ? (
-                    <img
-                      src={getAssetImageUrl(coverAsset?.imageUrl || null) || ""}
-                      alt={pack.title}
-                      className="h-full w-full object-cover"
-                    />
+                    <div className="absolute inset-0 flex items-center justify-center p-6 sm:p-8">
+                      <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-[24px] border border-white/10 bg-slate-950/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_24px_60px_rgba(2,8,23,0.3)]">
+                        <img
+                          src={getAssetImageUrl(coverAsset?.imageUrl || null) || ""}
+                          alt={pack.title}
+                          className="h-full w-full object-contain object-center"
+                        />
+                      </div>
+                    </div>
                   ) : (
                     <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-800 to-slate-950 text-slate-500">
                       <ImageIcon className="h-10 w-10" />

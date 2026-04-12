@@ -6,6 +6,7 @@ import {
   fetchCreatorPayoutStatus,
   fetchPurchaseById
 } from "../utils/commerce.js";
+import { getAssetPublicationState } from "../utils/asset-delivery.js";
 
 const VALID_PAYMENT_STATUSES = new Set(PAYMENT_STATUSES);
 
@@ -83,6 +84,18 @@ const getCheckoutOffering = async (db, { assetId, packId, licenseId }) => {
       a.title AS asset_title,
       a.description AS asset_description,
       a.status AS asset_status,
+      a.review_status,
+      a.review_note,
+      a.image_url,
+      a.preview_image_url,
+      a.master_file_url,
+      a.master_file_name,
+      a.master_mime_type,
+      a.master_file_size,
+      a.master_width,
+      a.master_height,
+      a.master_aspect_ratio,
+      a.master_resolution_summary,
       a.owner_user_id AS asset_owner_user_id,
       l.id AS license_id,
       l.asset_id AS license_asset_id,
@@ -110,7 +123,9 @@ const getCheckoutOffering = async (db, { assetId, packId, licenseId }) => {
     throw new Error("The selected license does not belong to this asset");
   }
 
-  if (assetLicense.asset_status !== "published" || assetLicense.license_status !== "published") {
+  const publicationState = getAssetPublicationState(assetLicense);
+
+  if (!publicationState.buyerVisible || assetLicense.license_status !== "published") {
     throw new Error("This visual asset is no longer available for licensing");
   }
 

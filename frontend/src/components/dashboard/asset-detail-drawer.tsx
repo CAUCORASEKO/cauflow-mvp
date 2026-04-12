@@ -4,13 +4,22 @@ import {
   FolderUp,
   LoaderCircle,
   PencilLine,
+  RotateCcw,
+  Send,
   ShieldCheck,
   ShoppingCart,
   Sparkles,
+  Stamp,
   Trash2,
   X
 } from "lucide-react";
-import { fetchAssetById, getAssetImageUrl, updateAsset } from "@/services/api";
+import {
+  fetchAssetById,
+  getAssetImageUrl,
+  submitAssetForReview,
+  updateAsset,
+  updateAssetReview
+} from "@/services/api";
 import { formatLicenseType, formatLicenseUsage } from "@/lib/license-taxonomy";
 import {
   assetDeliveryRulesCopy,
@@ -32,6 +41,12 @@ import {
   getCatalogStatusBadgeClassName,
   getCatalogStatusHelperCopy
 } from "@/lib/catalog-lifecycle";
+import {
+  formatAssetReviewStatus,
+  getAssetPublishGateCopy,
+  getAssetReviewBadgeClassName,
+  getAssetReviewHelperCopy
+} from "@/lib/asset-review";
 import { formatVisualAssetType, visualAssetTypeOptions } from "@/lib/visual-taxonomy";
 
 function AssetFileCard({
@@ -116,17 +131,21 @@ export function AssetDetailDrawer({
   const [description, setDescription] = useState("");
   const [visualType, setVisualType] = useState<Asset["visualType"]>("photography");
   const [status, setStatus] = useState<Asset["status"]>("published");
+  const [reviewNote, setReviewNote] = useState("");
   const [replacementPreviewImage, setReplacementPreviewImage] = useState<File | null>(null);
   const [replacementMasterFile, setReplacementMasterFile] = useState<File | null>(null);
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [isUpdatingReview, setIsUpdatingReview] = useState(false);
 
   useEffect(() => {
     if (!assetId) {
       setAsset(null);
       setError(null);
       setIsEditing(false);
+      setReviewNote("");
       setReplacementPreviewImage(null);
       setReplacementMasterFile(null);
       setSaveFeedback(null);
@@ -166,6 +185,7 @@ export function AssetDetailDrawer({
         setDescription(nextAsset.description || "");
         setVisualType(nextAsset.visualType);
         setStatus(nextAsset.status);
+        setReviewNote(nextAsset.reviewNote || "");
       } catch (loadError) {
         if (cancelled) {
           return;
@@ -235,6 +255,13 @@ export function AssetDetailDrawer({
   const activeImagePreview = replacementPreviewUrl || getAssetImageUrl(basePreviewUrl);
   const readinessStatus = asset?.deliveryReadiness?.status;
   const readinessNotes = asset?.deliveryReadiness?.notes || [];
+  const reviewStatus = asset?.reviewStatus;
+  const reviewHelperCopy = asset ? getAssetReviewHelperCopy(asset) : "";
+  const publishGateCopy = asset ? getAssetPublishGateCopy(asset) : "";
+  const publishBlockedReasons = asset?.publishBlockedReasons || [];
+  const canSubmitForReview =
+    Boolean(asset?.deliveryReadiness?.isReady) &&
+    (reviewStatus === "draft" || reviewStatus === "rejected");
   const previewDraftFile = replacementPreviewImage
     ? {
         fileName: replacementPreviewImage.name,
@@ -278,6 +305,7 @@ export function AssetDetailDrawer({
           setDescription(nextAsset.description || "");
           setVisualType(nextAsset.visualType);
           setStatus(nextAsset.status);
+          setReviewNote(nextAsset.reviewNote || "");
         })
         .catch((loadError) => {
           setAsset(null);
@@ -313,6 +341,7 @@ export function AssetDetailDrawer({
       setDescription(updatedAsset.description || "");
       setVisualType(updatedAsset.visualType);
       setStatus(updatedAsset.status);
+      setReviewNote(updatedAsset.reviewNote || "");
       setReplacementPreviewImage(null);
       setReplacementMasterFile(null);
       setIsEditing(false);
@@ -347,6 +376,7 @@ export function AssetDetailDrawer({
       setDescription(updatedAsset.description || "");
       setVisualType(updatedAsset.visualType);
       setStatus(updatedAsset.status);
+      setReviewNote(updatedAsset.reviewNote || "");
       setSaveFeedback(`Asset moved to ${formatCatalogStatus(nextStatus).toLowerCase()}.`);
       onAssetUpdated(updatedAsset);
     } catch (submissionError) {
@@ -357,6 +387,67 @@ export function AssetDetailDrawer({
       );
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSubmitForReview = async () => {
+    if (!asset) {
+      return;
+    }
+
+    try {
+      setIsSubmittingReview(true);
+      setSaveFeedback(null);
+      setSaveError(null);
+      const updatedAsset = await submitAssetForReview(asset.id);
+      setAsset(updatedAsset);
+      setStatus(updatedAsset.status);
+      setReviewNote(updatedAsset.reviewNote || "");
+      setSaveFeedback("Asset submitted for review.");
+      onAssetUpdated(updatedAsset);
+    } catch (submissionError) {
+      setSaveError(
+        submissionError instanceof Error
+          ? submissionError.message
+          : "Unable to submit asset for review"
+      );
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
+
+  const handleReviewDecision = async (nextReviewStatus: Asset["reviewStatus"]) => {
+    if (!asset) {
+      return;
+    }
+
+    try {
+      setIsUpdatingReview(true);
+      setSaveFeedback(null);
+      setSaveError(null);
+      const updatedAsset = await updateAssetReview(asset.id, {
+        reviewStatus: nextReviewStatus,
+        reviewNote
+      });
+      setAsset(updatedAsset);
+      setStatus(updatedAsset.status);
+      setReviewNote(updatedAsset.reviewNote || "");
+      setSaveFeedback(
+        nextReviewStatus === "approved"
+          ? "Asset approved."
+          : nextReviewStatus === "rejected"
+            ? "Asset rejected with review notes."
+            : "Asset returned to draft."
+      );
+      onAssetUpdated(updatedAsset);
+    } catch (submissionError) {
+      setSaveError(
+        submissionError instanceof Error
+          ? submissionError.message
+          : "Unable to update asset review"
+      );
+    } finally {
+      setIsUpdatingReview(false);
     }
   };
 
@@ -467,6 +558,18 @@ export function AssetDetailDrawer({
                 </div>
                 <div className="rounded-[22px] border border-white/8 bg-white/[0.025] p-4">
                   <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                    Review state
+                  </p>
+                  <span
+                    className={`mt-2 inline-flex rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetReviewBadgeClassName(
+                      reviewStatus
+                    )}`}
+                  >
+                    {formatAssetReviewStatus(reviewStatus)}
+                  </span>
+                </div>
+                <div className="rounded-[22px] border border-white/8 bg-white/[0.025] p-4">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
                     Visual category
                   </p>
                   <p className="mt-2 text-sm font-medium text-white">
@@ -475,7 +578,7 @@ export function AssetDetailDrawer({
                 </div>
                 <div className="rounded-[22px] border border-white/8 bg-white/[0.025] p-4">
                   <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
-                    Lifecycle
+                    Catalog lifecycle
                   </p>
                   <p className="mt-2 text-sm font-medium text-white">
                     {formatCatalogStatus(asset.status)}
@@ -503,13 +606,22 @@ export function AssetDetailDrawer({
                 <div className="mb-5 rounded-[22px] border border-white/8 bg-slate-950/45 p-4">
                   <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div>
-                      <span
-                        className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getCatalogStatusBadgeClassName(
-                          asset.status
-                        )}`}
-                      >
-                        {formatCatalogStatus(asset.status)}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getCatalogStatusBadgeClassName(
+                            asset.status
+                          )}`}
+                        >
+                          {formatCatalogStatus(asset.status)}
+                        </span>
+                        <span
+                          className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetReviewBadgeClassName(
+                            reviewStatus
+                          )}`}
+                        >
+                          {formatAssetReviewStatus(reviewStatus)}
+                        </span>
+                      </div>
                       <p className="mt-3 text-sm leading-6 text-slate-300">
                         {getCatalogStatusHelperCopy(asset.status, "This asset")}
                       </p>
@@ -555,6 +667,142 @@ export function AssetDetailDrawer({
                         </Button>
                       )}
                     </div>
+                  </div>
+                </div>
+
+                <div className="mb-5 rounded-[22px] border border-white/8 bg-slate-950/45 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                        Publish gate
+                      </p>
+                      <p className="mt-2 text-sm text-white">{publishGateCopy}</p>
+                    </div>
+                    <span
+                      className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${
+                        asset.canPublish
+                          ? "border-emerald-400/20 bg-emerald-400/[0.08] text-emerald-100"
+                          : "border-amber-300/18 bg-amber-300/[0.08] text-amber-100"
+                      }`}
+                    >
+                      {asset.canPublish ? "Publish eligible" : "Publish blocked"}
+                    </span>
+                  </div>
+                  {publishBlockedReasons.length > 0 ? (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {publishBlockedReasons.map((reason) => (
+                        <span
+                          key={reason}
+                          className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-300"
+                        >
+                          {reason}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="mb-5 rounded-[22px] border border-white/8 bg-slate-950/45 p-4">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                        Review workflow
+                      </p>
+                      <p className="mt-2 text-sm text-white">{reviewHelperCopy}</p>
+                      <p className="mt-3 text-sm leading-6 text-slate-400">
+                        Temporary internal review controls are exposed here until a dedicated moderation workspace exists.
+                      </p>
+                    </div>
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/8 bg-white/[0.04] text-sky-200">
+                      <Stamp className="h-5 w-5" />
+                    </div>
+                  </div>
+
+                  <div className="mt-4 space-y-3">
+                    <div className="rounded-[20px] border border-white/8 bg-black/20 p-4">
+                      <label className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                        Review note
+                      </label>
+                      <Textarea
+                        className="mt-3 min-h-[132px]"
+                        value={reviewNote}
+                        onChange={(event) => setReviewNote(event.target.value)}
+                        placeholder="Add approval context or explain what still needs to be fixed."
+                      />
+                    </div>
+
+                    {reviewStatus !== "approved" ? (
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="gap-2"
+                          disabled={!canSubmitForReview || isSubmittingReview || isUpdatingReview}
+                          onClick={() => void handleSubmitForReview()}
+                        >
+                          <Send className="h-4 w-4" />
+                          {isSubmittingReview ? "Submitting..." : "Submit for review"}
+                        </Button>
+
+                        {reviewStatus === "in_review" ? (
+                          <>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              className="gap-2 border-emerald-400/20 bg-emerald-400/[0.08] text-emerald-100 hover:bg-emerald-400/[0.14]"
+                              disabled={isUpdatingReview || isSubmittingReview}
+                              onClick={() => void handleReviewDecision("approved")}
+                            >
+                              <ShieldCheck className="h-4 w-4" />
+                              {isUpdatingReview ? "Saving..." : "Approve"}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              className="gap-2 border-rose-400/18 bg-rose-400/[0.08] text-rose-100 hover:bg-rose-400/[0.14]"
+                              disabled={isUpdatingReview || isSubmittingReview}
+                              onClick={() => void handleReviewDecision("rejected")}
+                            >
+                              <X className="h-4 w-4" />
+                              {isUpdatingReview ? "Saving..." : "Reject"}
+                            </Button>
+                          </>
+                        ) : null}
+
+                        {reviewStatus === "rejected" ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="gap-2"
+                            disabled={isUpdatingReview || isSubmittingReview}
+                            onClick={() => void handleReviewDecision("draft")}
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                            Return to draft
+                          </Button>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="gap-2"
+                          disabled={isUpdatingReview}
+                          onClick={() => void handleReviewDecision("draft")}
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                          Return to draft
+                        </Button>
+                      </div>
+                    )}
+
+                    {!canSubmitForReview && reviewStatus !== "in_review" && reviewStatus !== "approved" ? (
+                      <p className="text-sm leading-6 text-slate-400">
+                        {readinessNotes[0] ||
+                          "Resolve delivery requirements before requesting review."}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
 
@@ -619,6 +867,25 @@ export function AssetDetailDrawer({
                         {assetDeliveryRulesCopy}
                       </p>
                     </div>
+                    <div className="rounded-[22px] border border-white/8 bg-slate-950/45 p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                            Review note
+                          </p>
+                          <p className="mt-2 text-sm text-white">
+                            {asset.reviewNote || "No decision note has been recorded yet."}
+                          </p>
+                        </div>
+                        <span
+                          className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetReviewBadgeClassName(
+                            reviewStatus
+                          )}`}
+                        >
+                          {formatAssetReviewStatus(reviewStatus)}
+                        </span>
+                      </div>
+                    </div>
                     <AssetFileCard
                       label="Preview image"
                       helper="Shown in workspace and marketplace surfaces."
@@ -660,8 +927,9 @@ export function AssetDetailDrawer({
                         <option value="archived">Archived</option>
                       </Select>
                       <p className="text-sm leading-6 text-slate-400">
-                        Draft hides this asset from buyer-facing marketplace. Archived preserves
-                        history while removing it from active circulation.
+                        Publish is only allowed after approval and delivery readiness. Draft hides
+                        this asset from buyer-facing marketplace. Archived preserves history while
+                        removing it from active circulation.
                       </p>
                     </div>
                     <div className="space-y-2">

@@ -118,6 +118,11 @@ export function PurchasesPage() {
                     </Button>
                   </Link>
                 ) : null}
+                {purchase.payment?.status === "paid" && purchase.assetId ? (
+                  <Link to="/app/buyer/downloads">
+                    <Button variant="ghost">Open premium delivery</Button>
+                  </Link>
+                ) : null}
               </div>
             </Card>
           ))

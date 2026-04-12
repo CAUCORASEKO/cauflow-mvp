@@ -4,7 +4,9 @@ import {
   getAssets,
   getAssetById,
   updateAsset,
-  deleteAsset
+  deleteAsset,
+  submitAssetForReview,
+  updateAssetReview
 } from "../controllers/asset.controller.js";
 import { uploadAssetImage } from "../middleware/asset-upload.middleware.js";
 import {
@@ -19,6 +21,20 @@ router.post("/", requireAuth, requireVerifiedAccount, requireCreatorOrAdmin, upl
 router.get("/", getAssets);
 router.get("/:id", getAssetById);
 router.patch("/:id", requireAuth, requireVerifiedAccount, requireCreatorOrAdmin, uploadAssetImage, updateAsset);
+router.post(
+  "/:id/review/submit",
+  requireAuth,
+  requireVerifiedAccount,
+  requireCreatorOrAdmin,
+  submitAssetForReview
+);
+router.patch(
+  "/:id/review",
+  requireAuth,
+  requireVerifiedAccount,
+  requireCreatorOrAdmin,
+  updateAssetReview
+);
 router.delete("/:id", requireAuth, requireVerifiedAccount, requireCreatorOrAdmin, deleteAsset);
 
 export default router;

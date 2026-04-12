@@ -9,6 +9,12 @@ export const ALLOWED_ASSET_MIME_TYPES = new Set([
 export const ALLOWED_ASSET_EXTENSIONS_LABEL = "JPG, PNG, or WebP";
 export const MIN_PREMIUM_LONG_EDGE = 2000;
 export const MIN_PREMIUM_SHORT_EDGE = 1400;
+export const ASSET_REVIEW_STATUSES = new Set([
+  "draft",
+  "in_review",
+  "approved",
+  "rejected"
+]);
 
 const gcd = (left, right) => {
   let a = Math.abs(left);
@@ -172,6 +178,20 @@ export const buildStoredAssetFilePayload = async (file) => {
   };
 };
 
+export const normalizeAssetReviewStatus = (value, fallback = "draft") => {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return fallback;
+  }
+
+  const normalizedValue = value.trim().toLowerCase();
+
+  if (!ASSET_REVIEW_STATUSES.has(normalizedValue)) {
+    throw new Error("reviewStatus must be one of: draft, in_review, approved, rejected");
+  }
+
+  return normalizedValue;
+};
+
 const buildAssetFileSummary = (raw) => {
   const url = raw.url || null;
   const fileName = raw.fileName || null;
@@ -246,6 +266,95 @@ export const getDeliveryReadiness = ({ previewUrl, masterFile }) => {
   };
 };
 
+const getDeliveryBlockerCopy = (note, context = "publish") => {
+  const normalizedContext =
+    context === "submit"
+      ? "submitted for review"
+      : context === "approve"
+        ? "approved"
+        : "published";
+
+  if (note === "Missing preview image") {
+    return `This asset still needs a preview image before it can be ${normalizedContext}.`;
+  }
+
+  if (note === "Missing master delivery file") {
+    return `This asset still needs a valid master delivery file before it can be ${normalizedContext}.`;
+  }
+
+  if (note === "Unsupported format") {
+    return `This asset needs a supported master delivery format before it can be ${normalizedContext}.`;
+  }
+
+  if (note === "Master file metadata is incomplete") {
+    return `This asset still needs complete master file metadata before it can be ${normalizedContext}.`;
+  }
+
+  if (note === "Resolution too low for premium delivery") {
+    return `This asset needs a higher-resolution master delivery file before it can be ${normalizedContext}.`;
+  }
+
+  return context === "submit"
+    ? "This asset still needs delivery fixes before it can be submitted for review."
+    : "This asset still needs delivery fixes before it can go live in the marketplace.";
+};
+
+export const getAssetReviewSubmissionBlockedReasons = (deliveryReadiness) => {
+  if (deliveryReadiness?.isReady) {
+    return [];
+  }
+
+  return (deliveryReadiness?.notes || []).map((note) => getDeliveryBlockerCopy(note, "submit"));
+};
+
+export const getAssetPublishBlockedReasons = ({ reviewStatus, deliveryReadiness }) => {
+  const blockedReasons = [];
+
+  if (!deliveryReadiness?.isReady) {
+    blockedReasons.push(
+      ...(deliveryReadiness?.notes || []).map((note) => getDeliveryBlockerCopy(note, "publish"))
+    );
+  }
+
+  if (reviewStatus !== "approved") {
+    blockedReasons.push("This asset must be approved before it can go live in the marketplace.");
+  }
+
+  return blockedReasons;
+};
+
+export const getAssetPublicationState = (row) => {
+  const previewUrl = row.preview_image_url || row.image_url || null;
+  const catalogStatus = row.status || row.asset_status || "draft";
+  const reviewStatus = normalizeAssetReviewStatus(row.review_status, "draft");
+  const masterFile = buildAssetFileSummary({
+    url: row.master_file_url,
+    fileName: row.master_file_name,
+    mimeType: row.master_mime_type,
+    fileSize: row.master_file_size,
+    width: row.master_width,
+    height: row.master_height,
+    aspectRatio: row.master_aspect_ratio,
+    resolutionSummary: row.master_resolution_summary
+  });
+  const deliveryReadiness = getDeliveryReadiness({
+    previewUrl,
+    masterFile
+  });
+  const publishBlockedReasons = getAssetPublishBlockedReasons({
+    reviewStatus,
+    deliveryReadiness
+  });
+
+  return {
+    reviewStatus,
+    deliveryReadiness,
+    canPublish: publishBlockedReasons.length === 0,
+    publishBlockedReasons,
+    buyerVisible: catalogStatus === "published" && publishBlockedReasons.length === 0
+  };
+};
+
 export const serializeAssetRecord = (row) => {
   const previewUrl = row.preview_image_url || row.image_url || null;
   const previewFile = buildAssetFileSummary({
@@ -268,10 +377,7 @@ export const serializeAssetRecord = (row) => {
     aspectRatio: row.master_aspect_ratio,
     resolutionSummary: row.master_resolution_summary
   });
-  const deliveryReadiness = getDeliveryReadiness({
-    previewUrl,
-    masterFile
-  });
+  const publicationState = getAssetPublicationState(row);
 
   return {
     ...row,
@@ -279,6 +385,10 @@ export const serializeAssetRecord = (row) => {
     preview_image_url: previewUrl,
     preview_file: previewFile,
     master_file: masterFile,
-    delivery_readiness: deliveryReadiness
+    review_status: publicationState.reviewStatus,
+    delivery_readiness: publicationState.deliveryReadiness,
+    can_publish: publicationState.canPublish,
+    publish_blocked_reasons: publicationState.publishBlockedReasons,
+    buyer_visible: publicationState.buyerVisible
   };
 };

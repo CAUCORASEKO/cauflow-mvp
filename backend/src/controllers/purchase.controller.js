@@ -1,6 +1,7 @@
 import { pool } from "../config/db.js";
 import { normalizeResponseData } from "../utils/normalize-response.js";
 import { buildPurchaseSelect, fetchPurchaseById } from "../utils/commerce.js";
+import { getAssetPublicationState } from "../utils/asset-delivery.js";
 
 export const createPurchase = async (req, res) => {
   try {
@@ -16,7 +17,22 @@ export const createPurchase = async (req, res) => {
 
     const licenseResult = await pool.query(
       `
-      SELECT l.*, a.owner_user_id AS asset_owner_user_id, a.status AS asset_status
+      SELECT
+        l.*,
+        a.owner_user_id AS asset_owner_user_id,
+        a.status AS asset_status,
+        a.review_status,
+        a.review_note,
+        a.image_url,
+        a.preview_image_url,
+        a.master_file_url,
+        a.master_file_name,
+        a.master_mime_type,
+        a.master_file_size,
+        a.master_width,
+        a.master_height,
+        a.master_aspect_ratio,
+        a.master_resolution_summary
       FROM licenses l
       JOIN assets a
         ON a.id = l.asset_id
@@ -33,7 +49,9 @@ export const createPurchase = async (req, res) => {
 
     const license = licenseResult.rows[0];
 
-    if (license.status !== "published" || license.asset_status !== "published") {
+    const publicationState = getAssetPublicationState(license);
+
+    if (license.status !== "published" || !publicationState.buyerVisible) {
       return res.status(409).json({
         message: "This visual asset is no longer available for new purchases"
       });

@@ -7,6 +7,10 @@ import {
   getAssetPreviewUrl,
   getAssetPrimaryReadinessNote
 } from "@/lib/asset-delivery";
+import {
+  formatAssetReviewStatus,
+  getAssetReviewBadgeClassName
+} from "@/lib/asset-review";
 import { formatDate } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import type { AssetViewMode } from "@/components/dashboard/asset-inventory-toolbar";
@@ -69,18 +73,23 @@ export function AssetsGrid({
         const licenseCount = licenseCountByAssetId.get(asset.id) || 0;
         const purchaseCount = purchaseCountByAssetId.get(asset.id) || 0;
         const deliveryStatus = asset.deliveryReadiness?.status;
+        const reviewStatus = asset.reviewStatus;
         const quickActionLabel =
           asset.status === "published"
             ? "Unpublish"
             : asset.status === "archived"
               ? "Restore"
-              : "Publish";
+              : asset.canPublish
+                ? "Publish"
+                : "Review detail";
         const quickActionClassName =
           asset.status === "published"
             ? "border-white/10 bg-white/[0.04] text-slate-100 hover:bg-white/[0.08]"
             : asset.status === "archived"
               ? "border-amber-300/15 bg-amber-300/[0.08] text-amber-100 hover:bg-amber-300/[0.12]"
-              : "border-emerald-400/15 bg-emerald-400/[0.08] text-emerald-100 hover:bg-emerald-400/[0.12]";
+              : asset.canPublish
+                ? "border-emerald-400/15 bg-emerald-400/[0.08] text-emerald-100 hover:bg-emerald-400/[0.12]"
+                : "border-sky-300/15 bg-sky-300/[0.08] text-sky-100 hover:bg-sky-300/[0.14]";
 
         return (
           <Card
@@ -137,6 +146,13 @@ export function AssetsGrid({
                       >
                         {formatAssetDeliveryStatus(deliveryStatus)}
                       </span>
+                      <span
+                        className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetReviewBadgeClassName(
+                          reviewStatus
+                        )}`}
+                      >
+                        {formatAssetReviewStatus(reviewStatus)}
+                      </span>
                     </div>
                   </div>
                 </button>
@@ -169,13 +185,14 @@ export function AssetsGrid({
                     </p>
                     <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2.5">
                       <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
-                        Delivery readiness
+                        Review + delivery
                       </p>
                       <p className="mt-1 text-sm font-medium text-white">
+                        {formatAssetReviewStatus(reviewStatus)} ·{" "}
                         {formatAssetDeliveryStatus(deliveryStatus)}
                       </p>
                       <p className="mt-2 text-sm leading-6 text-slate-400">
-                        {getAssetPrimaryReadinessNote(asset)}
+                        {asset.publishBlockedReasons?.[0] || getAssetPrimaryReadinessNote(asset)}
                       </p>
                     </div>
                   </div>
@@ -203,7 +220,11 @@ export function AssetsGrid({
                       <button
                         type="button"
                         className={`focus-ring inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] transition-all duration-300 ${quickActionClassName}`}
-                        onClick={() => onStatusAction(asset)}
+                        onClick={() =>
+                          asset.status === "draft" && !asset.canPublish
+                            ? onSelectAsset(asset)
+                            : onStatusAction(asset)
+                        }
                         disabled={isUpdatingStatus}
                       >
                         {isUpdatingStatus ? "Updating..." : quickActionLabel}
@@ -275,12 +296,19 @@ export function AssetsGrid({
                     >
                       {formatAssetDeliveryStatus(deliveryStatus)}
                     </span>
+                    <span
+                      className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetReviewBadgeClassName(
+                        reviewStatus
+                      )}`}
+                    >
+                      {formatAssetReviewStatus(reviewStatus)}
+                    </span>
                   </div>
                   <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-400">
                     {asset.description || "No description provided."}
                   </p>
                   <p className="mt-3 text-sm leading-6 text-slate-300">
-                    {getAssetPrimaryReadinessNote(asset)}
+                    {asset.publishBlockedReasons?.[0] || getAssetPrimaryReadinessNote(asset)}
                   </p>
                   <div className="mt-4 flex flex-wrap items-center gap-4 text-xs uppercase tracking-[0.18em] text-slate-500">
                     <span>Added {formatDate(asset.createdAt)}</span>
@@ -293,7 +321,11 @@ export function AssetsGrid({
                   <button
                     type="button"
                     className={`focus-ring inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] transition ${quickActionClassName}`}
-                    onClick={() => onStatusAction(asset)}
+                    onClick={() =>
+                      asset.status === "draft" && !asset.canPublish
+                        ? onSelectAsset(asset)
+                        : onStatusAction(asset)
+                    }
                     disabled={isUpdatingStatus}
                   >
                     {isUpdatingStatus ? "Updating..." : quickActionLabel}

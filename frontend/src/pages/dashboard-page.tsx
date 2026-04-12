@@ -424,6 +424,18 @@ export function DashboardPage() {
   }, [assetPendingDelete, loadDashboard]);
 
   const handleAssetStatusAction = useCallback(async (asset: Asset) => {
+    if (asset.status === "draft" && !asset.canPublish) {
+      setSelectedAssetId(asset.id);
+      setWorkspaceNotice({
+        tone: "error",
+        message:
+          asset.publishBlockedReasons?.[0] ||
+          "This asset must pass review and delivery checks before it can go live.",
+        detail: "Open the asset detail drawer to review the submission and approval controls."
+      });
+      return;
+    }
+
     const nextStatus: Asset["status"] =
       asset.status === "published"
         ? "draft"
@@ -453,7 +465,7 @@ export function DashboardPage() {
         tone: "error",
         message:
           statusError instanceof Error ? statusError.message : "Unable to update asset status",
-        detail: "Open the asset drawer if you need to review the full lifecycle controls."
+        detail: "Open the asset drawer if you need to review delivery and approval blockers."
       });
     } finally {
       setAssetStatusActionId(null);
@@ -816,9 +828,9 @@ export function DashboardPage() {
 
       <section
         id="assets"
-        className="scroll-mt-6 grid gap-5 xl:grid-cols-[minmax(320px,0.82fr),minmax(0,1.18fr)] 2xl:grid-cols-[380px,minmax(0,1fr)]"
+        className="scroll-mt-6 grid gap-5 2xl:grid-cols-[minmax(520px,0.92fr),minmax(0,1.08fr)]"
       >
-        <div className="xl:sticky xl:top-4 2xl:top-5 xl:self-start">
+        <div className="2xl:sticky 2xl:top-5 2xl:self-start">
           <AssetUploadForm onCreated={handleAssetCreated} />
         </div>
 

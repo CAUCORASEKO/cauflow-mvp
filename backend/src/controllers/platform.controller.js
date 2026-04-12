@@ -1,11 +1,137 @@
 import { pool } from "../config/db.js";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import { normalizeResponseData } from "../utils/normalize-response.js";
 import { fetchAccountByUserId } from "../utils/account.js";
 import { buildGrantSelect, buildPurchaseSelect } from "../utils/commerce.js";
+import { serializeAssetRecord } from "../utils/asset-delivery.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const getScalar = async (db, query, params = []) => {
   const result = await db.query(query, params);
   return result.rows[0]?.value ?? 0;
+};
+
+const getPremiumDeliveryState = (grant) => {
+  const isAssetGrant = Boolean(grant.asset_id || grant.asset?.id);
+  const masterFileName = grant.asset?.master_file_name || null;
+  const masterMimeType = grant.asset?.master_mime_type || null;
+  const masterFileSize =
+    grant.asset?.master_file_size === null || grant.asset?.master_file_size === undefined
+      ? null
+      : Number(grant.asset.master_file_size);
+  const resolutionSummary = grant.asset?.master_resolution_summary || null;
+  const aspectRatio = grant.asset?.master_aspect_ratio || null;
+
+  if (!isAssetGrant) {
+    return {
+      eligible: false,
+      available: false,
+      reason: "Premium master-file delivery is currently available for direct asset licenses only.",
+      downloadUrl: null,
+      fileName: null,
+      mimeType: null,
+      fileSize: null,
+      resolutionSummary: null,
+      aspectRatio: null
+    };
+  }
+
+  if (grant.status !== "active") {
+    return {
+      eligible: false,
+      available: false,
+      reason: "No active entitlement is available for this asset.",
+      downloadUrl: null,
+      fileName: masterFileName,
+      mimeType: masterMimeType,
+      fileSize: masterFileSize,
+      resolutionSummary,
+      aspectRatio
+    };
+  }
+
+  if (!grant.download_access) {
+    return {
+      eligible: false,
+      available: false,
+      reason: "This entitlement does not currently unlock premium delivery.",
+      downloadUrl: null,
+      fileName: masterFileName,
+      mimeType: masterMimeType,
+      fileSize: masterFileSize,
+      resolutionSummary,
+      aspectRatio
+    };
+  }
+
+  if (grant.purchase?.payment_status !== "paid" && grant.payment?.status !== "paid") {
+    return {
+      eligible: false,
+      available: false,
+      reason: "Payment must complete before premium download is unlocked.",
+      downloadUrl: null,
+      fileName: masterFileName,
+      mimeType: masterMimeType,
+      fileSize: masterFileSize,
+      resolutionSummary,
+      aspectRatio
+    };
+  }
+
+  if (!masterFileName) {
+    return {
+      eligible: true,
+      available: false,
+      reason: "Master delivery file is not available yet.",
+      downloadUrl: null,
+      fileName: null,
+      mimeType: masterMimeType,
+      fileSize: masterFileSize,
+      resolutionSummary,
+      aspectRatio
+    };
+  }
+
+  return {
+    eligible: true,
+    available: true,
+    reason: null,
+    downloadUrl: `/api/platform/entitlements/${grant.id}/download`,
+    fileName: masterFileName,
+    mimeType: masterMimeType,
+    fileSize: masterFileSize,
+    resolutionSummary,
+    aspectRatio
+  };
+};
+
+const serializeEntitlementRecord = (grant) => ({
+  ...grant,
+  premium_delivery: getPremiumDeliveryState(grant)
+});
+
+const fetchEntitlementForBuyer = async (buyerUserId, grantId) => {
+  const result = await pool.query(
+    `
+    ${buildGrantSelect("lg.id = $1 AND lg.buyer_user_id = $2")}
+    LIMIT 1
+    `,
+    [grantId, buyerUserId]
+  );
+
+  return result.rows[0] || null;
+};
+
+const resolveStoredUploadPath = (url) => {
+  if (!url?.startsWith("/uploads/")) {
+    return null;
+  }
+
+  return path.join(__dirname, "..", "..", url.replace(/^\//, ""));
 };
 
 export const getExploreFeed = async (req, res) => {
@@ -18,8 +144,26 @@ export const getExploreFeed = async (req, res) => {
           a.title,
           a.description,
           a.image_url,
+          a.preview_image_url,
+          a.preview_file_name,
+          a.preview_mime_type,
+          a.preview_file_size,
+          a.preview_width,
+          a.preview_height,
+          a.preview_aspect_ratio,
+          a.preview_resolution_summary,
+          a.master_file_url,
+          a.master_file_name,
+          a.master_mime_type,
+          a.master_file_size,
+          a.master_width,
+          a.master_height,
+          a.master_aspect_ratio,
+          a.master_resolution_summary,
           a.visual_type,
           a.status,
+          a.review_status,
+          a.review_note,
           a.created_at,
           a.owner_user_id,
           row_to_json(creator_summary) AS creator,
@@ -75,7 +219,6 @@ export const getExploreFeed = async (req, res) => {
         WHERE a.status = 'published'
           AND license_options.items IS NOT NULL
         ORDER BY a.created_at DESC
-        LIMIT 12
         `
       ),
       pool.query(
@@ -175,10 +318,15 @@ export const getExploreFeed = async (req, res) => {
       )
     ]);
 
+    const visibleAssets = assetsResult.rows
+      .map(serializeAssetRecord)
+      .filter((asset) => asset.buyer_visible)
+      .slice(0, 12);
+
     res.status(200).json({
       message: "Explore feed fetched successfully",
       data: normalizeResponseData({
-        assets: assetsResult.rows,
+        assets: visibleAssets,
         packs: packsResult.rows,
         licenses: licensesResult.rows
       })
@@ -365,11 +513,54 @@ export const getEntitlements = async (req, res) => {
 
     res.status(200).json({
       message: "Entitlements fetched successfully",
-      data: normalizeResponseData(result.rows)
+      data: normalizeResponseData(result.rows.map(serializeEntitlementRecord))
     });
   } catch (error) {
     res.status(500).json({
       message: "Error fetching entitlements",
+      error: error.message
+    });
+  }
+};
+
+export const downloadEntitlementMasterFile = async (req, res) => {
+  try {
+    const grantId = Number(req.params.id);
+    const entitlement = await fetchEntitlementForBuyer(req.user.id, grantId);
+
+    if (!entitlement) {
+      return res.status(404).json({
+        message: "Entitlement not found"
+      });
+    }
+
+    const premiumDelivery = getPremiumDeliveryState(entitlement);
+
+    if (!premiumDelivery.available) {
+      return res.status(409).json({
+        message: premiumDelivery.reason || "Premium delivery is not available for this entitlement."
+      });
+    }
+
+    const filePath = resolveStoredUploadPath(entitlement.asset?.master_file_url);
+
+    if (!filePath || !fs.existsSync(filePath)) {
+      return res.status(409).json({
+        message: "Master delivery file is not available yet."
+      });
+    }
+
+    if (premiumDelivery.mimeType) {
+      res.type(premiumDelivery.mimeType);
+    }
+
+    return res.download(
+      filePath,
+      premiumDelivery.fileName || `cauflow-asset-${entitlement.asset_id}`
+    );
+  } catch (error) {
+    res.status(500).json({
+      message: "Error downloading premium delivery file",
       error: error.message
     });
   }
