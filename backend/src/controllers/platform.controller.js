@@ -35,10 +35,10 @@ const buildPackItemDeliveryState = (grantId, item) => {
       available: false,
       reason:
         item.grant.status !== "active"
-          ? "No active entitlement is available for this pack."
+          ? "Entitlement inactive"
           : !item.grant.download_access
-            ? "This entitlement does not currently unlock premium delivery."
-            : "Payment must complete before premium download is unlocked.",
+            ? "Entitlement inactive"
+            : "Waiting for successful payment",
       downloadUrl: null,
       fileName: masterFileName,
       mimeType: masterMimeType,
@@ -51,7 +51,7 @@ const buildPackItemDeliveryState = (grantId, item) => {
   if (!item.master_file_url || !masterFileName) {
     return {
       available: false,
-      reason: "Master delivery file unavailable",
+      reason: "Included pack asset unavailable",
       downloadUrl: null,
       fileName: null,
       mimeType: masterMimeType,
@@ -63,7 +63,7 @@ const buildPackItemDeliveryState = (grantId, item) => {
 
   return {
     available: true,
-    reason: "Premium file ready",
+    reason: "Download available",
     downloadUrl: `/api/platform/entitlements/${grantId}/assets/${item.asset_id}/download`,
     fileName: masterFileName,
     mimeType: masterMimeType,
@@ -83,7 +83,7 @@ const buildPackPremiumDeliveryState = (grant, includedAssets = []) => {
       mode: "pack",
       eligible: false,
       available: false,
-      reason: "No active entitlement is available for this pack.",
+      reason: "Entitlement inactive",
       downloadUrl: null,
       fileName: null,
       mimeType: null,
@@ -99,7 +99,7 @@ const buildPackPremiumDeliveryState = (grant, includedAssets = []) => {
       mode: "pack",
       eligible: false,
       available: false,
-      reason: "This entitlement does not currently unlock premium delivery.",
+      reason: "Entitlement inactive",
       downloadUrl: null,
       fileName: null,
       mimeType: null,
@@ -115,7 +115,7 @@ const buildPackPremiumDeliveryState = (grant, includedAssets = []) => {
       mode: "pack",
       eligible: false,
       available: false,
-      reason: "Payment must complete before premium pack delivery is unlocked.",
+      reason: "Waiting for successful payment",
       downloadUrl: null,
       fileName: null,
       mimeType: null,
@@ -135,12 +135,12 @@ const buildPackPremiumDeliveryState = (grant, includedAssets = []) => {
     available: readyCount > 0,
     reason:
       totalCount === 0
-        ? "This purchased pack does not include any deliverable assets yet."
+        ? "No premium files available yet"
         : readyCount === totalCount
-          ? "Premium delivery is available for every included asset in this pack."
+          ? "Premium files ready across the full purchased pack."
           : readyCount > 0
-            ? `${readyCount} of ${totalCount} included assets are ready for premium download.`
-            : "Included assets are not available for premium download yet.",
+            ? `${readyCount} of ${totalCount} included assets are ready for download.`
+            : "Included pack assets are unavailable right now.",
     downloadUrl: null,
     fileName: null,
     mimeType: null,
@@ -171,7 +171,7 @@ const getPremiumDeliveryState = (grant) => {
       mode: "asset",
       eligible: false,
       available: false,
-      reason: "Premium master-file delivery is currently available for direct asset licenses only.",
+      reason: "No premium file available yet",
       downloadUrl: null,
       fileName: null,
       mimeType: null,
@@ -186,7 +186,7 @@ const getPremiumDeliveryState = (grant) => {
       mode: "asset",
       eligible: false,
       available: false,
-      reason: "No active entitlement is available for this asset.",
+      reason: "Entitlement inactive",
       downloadUrl: null,
       fileName: masterFileName,
       mimeType: masterMimeType,
@@ -201,7 +201,7 @@ const getPremiumDeliveryState = (grant) => {
       mode: "asset",
       eligible: false,
       available: false,
-      reason: "This entitlement does not currently unlock premium delivery.",
+      reason: "Entitlement inactive",
       downloadUrl: null,
       fileName: masterFileName,
       mimeType: masterMimeType,
@@ -216,7 +216,7 @@ const getPremiumDeliveryState = (grant) => {
       mode: "asset",
       eligible: false,
       available: false,
-      reason: "Payment must complete before premium download is unlocked.",
+      reason: "Waiting for successful payment",
       downloadUrl: null,
       fileName: masterFileName,
       mimeType: masterMimeType,
@@ -231,7 +231,7 @@ const getPremiumDeliveryState = (grant) => {
       mode: "asset",
       eligible: true,
       available: false,
-      reason: "Master delivery file is not available yet.",
+      reason: "No premium file available yet",
       downloadUrl: null,
       fileName: null,
       mimeType: masterMimeType,
@@ -245,7 +245,7 @@ const getPremiumDeliveryState = (grant) => {
     mode: "asset",
     eligible: true,
     available: true,
-    reason: null,
+    reason: "Download available",
     downloadUrl: `/api/platform/entitlements/${grant.id}/download`,
     fileName: masterFileName,
     mimeType: masterMimeType,

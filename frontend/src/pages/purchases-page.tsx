@@ -5,21 +5,49 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatLicenseType, formatLicenseUsage } from "@/lib/license-taxonomy";
+import { getPremiumDeliveryStateCopy } from "@/lib/premium-delivery";
 import { buyerNav } from "@/lib/platform-nav";
 import { formatCurrency, formatDate, humanizeLabel } from "@/lib/utils";
-import { fetchPurchases } from "@/services/api";
-import type { Purchase } from "@/types/api";
+import { fetchEntitlements, fetchPurchases } from "@/services/api";
+import type { LicenseGrant, Purchase } from "@/types/api";
 import { formatPackCategory, formatVisualAssetType } from "@/lib/visual-taxonomy";
 
 const getOfferingTitle = (purchase: Purchase) =>
   purchase.pack?.title || purchase.asset?.title || `License #${purchase.licenseId}`;
 
+const getPaymentState = (purchase: Purchase) =>
+  purchase.payment?.status || purchase.paymentStatus || purchase.status;
+
+const getDeliveryState = (purchase: Purchase, grant: LicenseGrant | undefined) => {
+  if (grant) {
+    return grant.premiumDelivery?.available
+      ? "Available in Downloads"
+      : getPremiumDeliveryStateCopy(grant);
+  }
+
+  if (getPaymentState(purchase) !== "paid") {
+    return "Waiting for successful payment";
+  }
+
+  if (purchase.assetId && !purchase.asset?.masterFile?.fileName) {
+    return "No premium file available yet";
+  }
+
+  return "Entitlement inactive";
+};
+
 export function PurchasesPage() {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [grants, setGrants] = useState<LicenseGrant[]>([]);
 
   useEffect(() => {
-    void fetchPurchases().then(setPurchases);
+    void Promise.all([fetchPurchases(), fetchEntitlements()]).then(([history, entitlements]) => {
+      setPurchases(history);
+      setGrants(entitlements);
+    });
   }, []);
+
+  const grantsByPurchaseId = new Map(grants.map((grant) => [grant.purchaseId, grant]));
 
   return (
     <AppShell title="Purchases" subtitle="Recorded buyer history and payment outcomes" navItems={buyerNav}>
@@ -37,8 +65,11 @@ export function PurchasesPage() {
 
       <div className="grid gap-5">
         {purchases.length ? (
-          purchases.map((purchase) => (
-            <Card key={purchase.id} className="surface-highlight p-6">
+          purchases.map((purchase) => {
+            const relatedGrant = grantsByPurchaseId.get(purchase.id);
+
+            return (
+              <Card key={purchase.id} className="surface-highlight p-6">
               <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-3">
@@ -74,7 +105,7 @@ export function PurchasesPage() {
                 </div>
               </div>
 
-              <div className="mt-6 grid gap-4 md:grid-cols-4">
+              <div className="mt-6 grid gap-4 md:grid-cols-5">
                 <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Purchase</p>
                   <p className="mt-2 text-white">#{purchase.id}</p>
@@ -96,7 +127,16 @@ export function PurchasesPage() {
                 <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Entitlement</p>
                   <p className="mt-2 text-white">
-                    {purchase.payment?.status === "paid" ? "Active license" : "Inactive until paid"}
+                    {getPaymentState(purchase) === "paid" ? "Active license" : "Inactive until paid"}
+                  </p>
+                </div>
+                <div className="rounded-[24px] border border-white/10 bg-black/20 p-4 md:col-span-2">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Delivery</p>
+                  <p className="mt-2 text-white">{getDeliveryState(purchase, relatedGrant)}</p>
+                  <p className="mt-2 text-sm text-slate-400">
+                    {purchase.pack
+                      ? "Downloads organizes included pack assets as separate premium files."
+                      : "Downloads is the main surface for premium file retrieval."}
                   </p>
                 </div>
               </div>
@@ -118,16 +158,15 @@ export function PurchasesPage() {
                     </Button>
                   </Link>
                 ) : null}
-                {purchase.payment?.status === "paid" && (purchase.assetId || purchase.packId) ? (
+                {getPaymentState(purchase) === "paid" && (purchase.assetId || purchase.packId) ? (
                   <Link to="/app/buyer/downloads">
-                    <Button variant="ghost">
-                      {purchase.packId ? "Open pack delivery" : "Open premium delivery"}
-                    </Button>
+                    <Button variant="ghost">Open Downloads</Button>
                   </Link>
                 ) : null}
               </div>
-            </Card>
-          ))
+              </Card>
+            );
+          })
         ) : (
           <Card className="surface-highlight p-6">
             <p className="text-lg text-white">No purchases recorded yet.</p>

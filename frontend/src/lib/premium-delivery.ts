@@ -1,6 +1,9 @@
 import type { LicenseGrant } from "@/types/api";
 import { formatFileSize } from "@/lib/utils";
 
+export const getDeliveryTypeLabel = (grant: LicenseGrant) =>
+  grant.premiumDelivery?.mode === "pack" ? "Pack delivery" : "Single asset delivery";
+
 export const getPremiumDeliveryLabel = (grant: LicenseGrant) =>
   grant.premiumDelivery?.mode === "pack"
     ? grant.premiumDelivery?.available
@@ -12,6 +15,18 @@ export const getPremiumDeliveryLabel = (grant: LicenseGrant) =>
 
 export const getPremiumDeliveryTone = (grant: LicenseGrant) =>
   grant.premiumDelivery?.available ? "ready" : "locked";
+
+export const getPremiumDeliveryStateCopy = (grant: LicenseGrant) => {
+  if (!grant.premiumDelivery) {
+    return "No premium file available yet";
+  }
+
+  if (grant.premiumDelivery.available) {
+    return grant.premiumDelivery.mode === "pack" ? "Pack delivery ready" : "Premium file ready";
+  }
+
+  return grant.premiumDelivery.reason || "No premium file available yet";
+};
 
 export const getPremiumDeliverySummary = (grant: LicenseGrant) =>
   grant.premiumDelivery?.reason ||

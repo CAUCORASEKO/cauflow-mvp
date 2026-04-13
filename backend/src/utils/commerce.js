@@ -68,6 +68,24 @@ export const buildPurchaseSelect = (whereClause = "TRUE") => `
       a.title,
       a.description,
       a.image_url,
+      a.preview_image_url,
+      a.preview_file_name,
+      a.preview_mime_type,
+      a.preview_file_size,
+      a.preview_width,
+      a.preview_height,
+      a.preview_aspect_ratio,
+      a.preview_resolution_summary,
+      a.master_file_url,
+      a.master_file_name,
+      a.master_mime_type,
+      a.master_file_size,
+      a.master_width,
+      a.master_height,
+      a.master_aspect_ratio,
+      a.master_resolution_summary,
+      a.review_status,
+      a.review_note,
       a.visual_type,
       a.status,
       a.created_at,
@@ -87,7 +105,12 @@ export const buildPurchaseSelect = (whereClause = "TRUE") => `
       pk.license_id,
       pk.created_at,
       pk.updated_at,
-      pk.owner_user_id
+      pk.owner_user_id,
+      (
+        SELECT COUNT(*)::int
+        FROM pack_assets pa
+        WHERE pa.pack_id = pk.id
+      ) AS asset_count
     FROM packs pk
     WHERE pk.id = p.pack_id
   ) AS pack_summary ON true

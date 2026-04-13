@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Download, Lock, ShieldCheck } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Lock, ShieldCheck } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
-import { ActionFeedback } from "@/components/dashboard/action-feedback";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatLicenseType, formatLicenseUsage } from "@/lib/license-taxonomy";
@@ -13,12 +13,7 @@ import {
 } from "@/lib/premium-delivery";
 import { buyerNav } from "@/lib/platform-nav";
 import { formatCurrency, formatDate, formatFileSize, humanizeLabel } from "@/lib/utils";
-import {
-  getAssetImageUrl,
-  downloadEntitlementMasterFile,
-  downloadPackEntitlementAssetMasterFile,
-  fetchEntitlements
-} from "@/services/api";
+import { getAssetImageUrl, fetchEntitlements } from "@/services/api";
 import type { LicenseGrant } from "@/types/api";
 import { formatPackCategory, formatVisualAssetType } from "@/lib/visual-taxonomy";
 
@@ -41,32 +36,21 @@ const getPackAssetMeta = (item: PackIncludedAsset) =>
 
 export function ActiveLicensesPage() {
   const [grants, setGrants] = useState<LicenseGrant[]>([]);
-  const [downloadingKey, setDownloadingKey] = useState<string | null>(null);
-  const [notice, setNotice] = useState<{ tone: "success" | "error"; message: string } | null>(
-    null
-  );
 
   useEffect(() => {
     void fetchEntitlements().then(setGrants);
   }, []);
-
-  useEffect(() => {
-    if (!notice) {
-      return;
-    }
-
-    const timeout = window.setTimeout(() => setNotice(null), 3200);
-    return () => window.clearTimeout(timeout);
-  }, [notice]);
 
   return (
     <AppShell title="Active licenses" subtitle="Buyer rights activated by successful payment" navItems={buyerNav}>
       <section className="glass-panel rounded-[30px] border border-white/10 p-6 md:p-7">
         <p className="text-xs uppercase tracking-[0.24em] text-sky-200">Entitlements</p>
         <h1 className="mt-3 font-display text-4xl text-white md:text-5xl">Commercial rights live here after checkout clears.</h1>
+        <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300">
+          Downloads is now the main place to retrieve premium files. This view keeps the commercial
+          rights and delivery state visible alongside each active entitlement.
+        </p>
       </section>
-
-      {notice ? <ActionFeedback tone={notice.tone} message={notice.message} /> : null}
 
       <div className="grid gap-5">
         {grants.length ? (
@@ -155,40 +139,13 @@ export function ActiveLicensesPage() {
                   </div>
 
                   {grant.premiumDelivery?.mode === "pack" ? (
-                    <div className="inline-flex items-center gap-2 rounded-full border border-sky-300/15 bg-sky-300/[0.08] px-4 py-2 text-sm text-sky-100">
-                      Pack collection unlocked
-                    </div>
+                    <Link to="/app/buyer/downloads">
+                      <Button variant="secondary">Open Downloads</Button>
+                    </Link>
                   ) : grant.premiumDelivery?.available ? (
-                    <Button
-                      variant="secondary"
-                      className="gap-2"
-                      disabled={downloadingKey === `grant:${grant.id}`}
-                      onClick={async () => {
-                        try {
-                          setDownloadingKey(`grant:${grant.id}`);
-                          await downloadEntitlementMasterFile(grant.id);
-                          setNotice({
-                            tone: "success",
-                            message: "Premium master file download started."
-                          });
-                        } catch (error) {
-                          setNotice({
-                            tone: "error",
-                            message:
-                              error instanceof Error
-                                ? error.message
-                                : "Unable to download premium master file"
-                          });
-                        } finally {
-                          setDownloadingKey(null);
-                        }
-                      }}
-                    >
-                      <Download className="h-4 w-4 text-sky-200" />
-                      {downloadingKey === `grant:${grant.id}`
-                        ? "Preparing download..."
-                        : "Download master file"}
-                    </Button>
+                    <Link to="/app/buyer/downloads">
+                      <Button variant="secondary">Open Downloads</Button>
+                    </Link>
                   ) : (
                     <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-slate-300">
                       {getPremiumDeliveryTone(grant) === "locked" ? (
@@ -206,7 +163,6 @@ export function ActiveLicensesPage() {
                 <div className="mt-4 grid gap-3">
                   {grant.premiumDelivery.includedAssets?.map((item) => {
                     const imageUrl = getAssetImageUrl(item.previewImageUrl || item.previewFile?.url || null);
-                    const itemKey = `pack:${grant.id}:${item.id}`;
 
                     return (
                       <div
@@ -250,34 +206,9 @@ export function ActiveLicensesPage() {
                           </div>
 
                           {item.premiumDelivery.available ? (
-                            <Button
-                              variant="ghost"
-                              className="gap-2"
-                              disabled={downloadingKey === itemKey}
-                              onClick={async () => {
-                                try {
-                                  setDownloadingKey(itemKey);
-                                  await downloadPackEntitlementAssetMasterFile(grant.id, item.id);
-                                  setNotice({
-                                    tone: "success",
-                                    message: `${item.title} download started.`
-                                  });
-                                } catch (error) {
-                                  setNotice({
-                                    tone: "error",
-                                    message:
-                                      error instanceof Error
-                                        ? error.message
-                                        : "Unable to download pack delivery asset"
-                                  });
-                                } finally {
-                                  setDownloadingKey(null);
-                                }
-                              }}
-                            >
-                              <Download className="h-4 w-4" />
-                              {downloadingKey === itemKey ? "Preparing..." : "Download asset"}
-                            </Button>
+                            <Link to="/app/buyer/downloads">
+                              <Button variant="ghost">Open Downloads</Button>
+                            </Link>
                           ) : null}
                         </div>
                       </div>
