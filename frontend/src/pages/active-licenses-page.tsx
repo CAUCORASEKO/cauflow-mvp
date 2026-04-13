@@ -12,9 +12,11 @@ import {
   getPremiumDeliveryTone
 } from "@/lib/premium-delivery";
 import { buyerNav } from "@/lib/platform-nav";
-import { formatCurrency, formatDate, humanizeLabel } from "@/lib/utils";
+import { formatCurrency, formatDate, formatFileSize, humanizeLabel } from "@/lib/utils";
 import {
+  getAssetImageUrl,
   downloadEntitlementMasterFile,
+  downloadPackEntitlementAssetMasterFile,
   fetchEntitlements
 } from "@/services/api";
 import type { LicenseGrant } from "@/types/api";
@@ -23,9 +25,23 @@ import { formatPackCategory, formatVisualAssetType } from "@/lib/visual-taxonomy
 const getGrantTitle = (grant: LicenseGrant) =>
   grant.pack?.title || grant.asset?.title || `License #${grant.licenseId}`;
 
+type PackIncludedAsset = NonNullable<
+  NonNullable<LicenseGrant["premiumDelivery"]>["includedAssets"]
+>[number];
+
+const getPackAssetMeta = (item: PackIncludedAsset) =>
+  [
+    item.premiumDelivery.mimeType
+      ? item.premiumDelivery.mimeType.replace("image/", "").toUpperCase()
+      : null,
+    item.premiumDelivery.resolutionSummary || null,
+    item.premiumDelivery.aspectRatio ? `Aspect ${item.premiumDelivery.aspectRatio}` : null,
+    item.premiumDelivery.fileSize ? formatFileSize(item.premiumDelivery.fileSize) : null
+  ].filter(Boolean) as string[];
+
 export function ActiveLicensesPage() {
   const [grants, setGrants] = useState<LicenseGrant[]>([]);
-  const [downloadingGrantId, setDownloadingGrantId] = useState<number | null>(null);
+  const [downloadingKey, setDownloadingKey] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ tone: "success" | "error"; message: string } | null>(
     null
   );
@@ -138,14 +154,18 @@ export function ActiveLicensesPage() {
                     </div>
                   </div>
 
-                  {grant.premiumDelivery?.available ? (
+                  {grant.premiumDelivery?.mode === "pack" ? (
+                    <div className="inline-flex items-center gap-2 rounded-full border border-sky-300/15 bg-sky-300/[0.08] px-4 py-2 text-sm text-sky-100">
+                      Pack collection unlocked
+                    </div>
+                  ) : grant.premiumDelivery?.available ? (
                     <Button
                       variant="secondary"
                       className="gap-2"
-                      disabled={downloadingGrantId === grant.id}
+                      disabled={downloadingKey === `grant:${grant.id}`}
                       onClick={async () => {
                         try {
-                          setDownloadingGrantId(grant.id);
+                          setDownloadingKey(`grant:${grant.id}`);
                           await downloadEntitlementMasterFile(grant.id);
                           setNotice({
                             tone: "success",
@@ -160,12 +180,12 @@ export function ActiveLicensesPage() {
                                 : "Unable to download premium master file"
                           });
                         } finally {
-                          setDownloadingGrantId(null);
+                          setDownloadingKey(null);
                         }
                       }}
                     >
                       <Download className="h-4 w-4 text-sky-200" />
-                      {downloadingGrantId === grant.id
+                      {downloadingKey === `grant:${grant.id}`
                         ? "Preparing download..."
                         : "Download master file"}
                     </Button>
@@ -181,6 +201,90 @@ export function ActiveLicensesPage() {
                   )}
                 </div>
               </div>
+
+              {grant.premiumDelivery?.mode === "pack" ? (
+                <div className="mt-4 grid gap-3">
+                  {grant.premiumDelivery.includedAssets?.map((item) => {
+                    const imageUrl = getAssetImageUrl(item.previewImageUrl || item.previewFile?.url || null);
+                    const itemKey = `pack:${grant.id}:${item.id}`;
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4"
+                      >
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="flex min-w-0 gap-4">
+                            <div className="h-16 w-16 shrink-0 overflow-hidden rounded-[16px] border border-white/10 bg-slate-900">
+                              {imageUrl ? (
+                                <img
+                                  src={imageUrl}
+                                  alt={item.title}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center text-slate-500">
+                                  <Lock className="h-4 w-4" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-white">{item.title}</p>
+                              <p className="mt-1 text-sm leading-6 text-slate-400">
+                                {item.premiumDelivery.available
+                                  ? "Premium file ready"
+                                  : item.premiumDelivery.reason ||
+                                    "This included asset is not available for premium download yet"}
+                              </p>
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {getPackAssetMeta(item).map((meta) => (
+                                  <span
+                                    key={meta}
+                                    className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-300"
+                                  >
+                                    {meta}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          {item.premiumDelivery.available ? (
+                            <Button
+                              variant="ghost"
+                              className="gap-2"
+                              disabled={downloadingKey === itemKey}
+                              onClick={async () => {
+                                try {
+                                  setDownloadingKey(itemKey);
+                                  await downloadPackEntitlementAssetMasterFile(grant.id, item.id);
+                                  setNotice({
+                                    tone: "success",
+                                    message: `${item.title} download started.`
+                                  });
+                                } catch (error) {
+                                  setNotice({
+                                    tone: "error",
+                                    message:
+                                      error instanceof Error
+                                        ? error.message
+                                        : "Unable to download pack delivery asset"
+                                  });
+                                } finally {
+                                  setDownloadingKey(null);
+                                }
+                              }}
+                            >
+                              <Download className="h-4 w-4" />
+                              {downloadingKey === itemKey ? "Preparing..." : "Download asset"}
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
             </Card>
           ))
         ) : (

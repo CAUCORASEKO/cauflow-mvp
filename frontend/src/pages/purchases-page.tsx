@@ -118,9 +118,11 @@ export function PurchasesPage() {
                     </Button>
                   </Link>
                 ) : null}
-                {purchase.payment?.status === "paid" && purchase.assetId ? (
+                {purchase.payment?.status === "paid" && (purchase.assetId || purchase.packId) ? (
                   <Link to="/app/buyer/downloads">
-                    <Button variant="ghost">Open premium delivery</Button>
+                    <Button variant="ghost">
+                      {purchase.packId ? "Open pack delivery" : "Open premium delivery"}
+                    </Button>
                   </Link>
                 ) : null}
               </div>

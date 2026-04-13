@@ -657,6 +657,45 @@ export const downloadEntitlementMasterFile = async (grantId: number) => {
   window.URL.revokeObjectURL(objectUrl);
 };
 
+export const downloadPackEntitlementAssetMasterFile = async (
+  grantId: number,
+  assetId: number
+) => {
+  const response = await fetch(
+    `${API_BASE_URL}/platform/entitlements/${grantId}/assets/${assetId}/download`,
+    {
+      headers: getAuthHeaders()
+    }
+  );
+
+  if (!response.ok) {
+    const payload = (await response.json()) as ApiResponse<null>;
+    throw new ApiError(
+      payload.error || payload.message || "Unable to download pack delivery asset",
+      response.status,
+      payload.code
+    );
+  }
+
+  const blob = await response.blob();
+  const contentDisposition = response.headers.get("content-disposition") || "";
+  const fileNameMatch =
+    contentDisposition.match(/filename\*=UTF-8''([^;]+)/i) ||
+    contentDisposition.match(/filename=\"?([^"]+)\"?/i);
+  const fileName = fileNameMatch?.[1]
+    ? decodeURIComponent(fileNameMatch[1].replace(/"/g, ""))
+    : `cauflow-pack-asset-${assetId}`;
+
+  const objectUrl = window.URL.createObjectURL(blob);
+  const link = window.document.createElement("a");
+  link.href = objectUrl;
+  link.download = fileName;
+  window.document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(objectUrl);
+};
+
 export const createCheckoutSession = async (input: {
   assetId?: number | null;
   packId?: number | null;

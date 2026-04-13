@@ -243,6 +243,7 @@ export interface LicenseGrant {
   pack?: Pack | null;
   creator?: AccountSummary | null;
   premiumDelivery?: {
+    mode?: "asset" | "pack";
     eligible: boolean;
     available: boolean;
     reason: string | null;
@@ -252,6 +253,25 @@ export interface LicenseGrant {
     fileSize: number | null;
     resolutionSummary: string | null;
     aspectRatio: string | null;
+    includedAssets?: Array<{
+      id: number;
+      position: number;
+      title: string;
+      visualType?: VisualAssetType;
+      previewImageUrl?: string | null;
+      previewFile?: AssetFileRecord | null;
+      masterFile?: AssetFileRecord | null;
+      premiumDelivery: {
+        available: boolean;
+        reason: string | null;
+        downloadUrl: string | null;
+        fileName: string | null;
+        mimeType: string | null;
+        fileSize: number | null;
+        resolutionSummary: string | null;
+        aspectRatio: string | null;
+      };
+    }>;
   } | null;
 }
 
