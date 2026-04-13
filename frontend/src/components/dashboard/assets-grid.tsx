@@ -17,6 +17,30 @@ import type { AssetViewMode } from "@/components/dashboard/asset-inventory-toolb
 import { formatCatalogStatus, getCatalogStatusBadgeClassName } from "@/lib/catalog-lifecycle";
 import { formatVisualAssetType } from "@/lib/visual-taxonomy";
 
+const getAssetPublicationSummary = (asset: Asset) => {
+  if (asset.status === "published" && asset.canPublish) {
+    return {
+      label: "Live in marketplace",
+      detail: "Visible to buyers now.",
+      badgeClassName: "border-emerald-400/20 bg-emerald-400/[0.08] text-emerald-100"
+    };
+  }
+
+  if (asset.canPublish) {
+    return {
+      label: "Ready for publication",
+      detail: "Approved and delivery ready.",
+      badgeClassName: "border-sky-300/18 bg-sky-300/[0.08] text-sky-100"
+    };
+  }
+
+  return {
+    label: "Publication blocked",
+    detail: asset.publishBlockedReasons?.[0] || getAssetPrimaryReadinessNote(asset),
+    badgeClassName: "border-amber-300/18 bg-amber-300/[0.08] text-amber-100"
+  };
+};
+
 export function AssetsGrid({
   assets,
   licenses,
@@ -74,6 +98,7 @@ export function AssetsGrid({
         const purchaseCount = purchaseCountByAssetId.get(asset.id) || 0;
         const deliveryStatus = asset.deliveryReadiness?.status;
         const reviewStatus = asset.reviewStatus;
+        const publicationSummary = getAssetPublicationSummary(asset);
         const quickActionLabel =
           asset.status === "published"
             ? "Unpublish"
@@ -139,20 +164,6 @@ export function AssetsGrid({
                       >
                         {formatCatalogStatus(asset.status)}
                       </span>
-                      <span
-                        className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetDeliveryBadgeClassName(
-                          deliveryStatus
-                        )}`}
-                      >
-                        {formatAssetDeliveryStatus(deliveryStatus)}
-                      </span>
-                      <span
-                        className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetReviewBadgeClassName(
-                          reviewStatus
-                        )}`}
-                      >
-                        {formatAssetReviewStatus(reviewStatus)}
-                      </span>
                     </div>
                   </div>
                 </button>
@@ -183,17 +194,55 @@ export function AssetsGrid({
                     <p className="min-h-[4.5rem] text-sm leading-6 text-slate-400">
                       {asset.description || "No description provided."}
                     </p>
-                    <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2.5">
-                      <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
-                        Review + delivery
-                      </p>
-                      <p className="mt-1 text-sm font-medium text-white">
-                        {formatAssetReviewStatus(reviewStatus)} ·{" "}
-                        {formatAssetDeliveryStatus(deliveryStatus)}
-                      </p>
-                      <p className="mt-2 text-sm leading-6 text-slate-400">
-                        {asset.publishBlockedReasons?.[0] || getAssetPrimaryReadinessNote(asset)}
-                      </p>
+                    <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                            Commercial state
+                          </p>
+                          <p className="mt-1 text-sm font-medium text-white">
+                            {publicationSummary.label}
+                          </p>
+                          <p className="mt-2 text-sm leading-6 text-slate-400">
+                            {publicationSummary.detail}
+                          </p>
+                        </div>
+                        <span
+                          className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] ${publicationSummary.badgeClassName}`}
+                        >
+                          {formatCatalogStatus(asset.status)}
+                        </span>
+                      </div>
+                      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                        <div className="rounded-2xl border border-white/8 bg-black/20 px-3 py-2.5">
+                          <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                            Review status
+                          </p>
+                          <div className="mt-2">
+                            <span
+                              className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetReviewBadgeClassName(
+                                reviewStatus
+                              )}`}
+                            >
+                              {formatAssetReviewStatus(reviewStatus)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="rounded-2xl border border-white/8 bg-black/20 px-3 py-2.5">
+                          <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                            Delivery readiness
+                          </p>
+                          <div className="mt-2">
+                            <span
+                              className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetDeliveryBadgeClassName(
+                                deliveryStatus
+                              )}`}
+                            >
+                              {formatAssetDeliveryStatus(deliveryStatus)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -289,27 +338,50 @@ export function AssetsGrid({
                     >
                       {formatCatalogStatus(asset.status)}
                     </span>
-                    <span
-                      className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetDeliveryBadgeClassName(
-                        deliveryStatus
-                      )}`}
-                    >
-                      {formatAssetDeliveryStatus(deliveryStatus)}
-                    </span>
-                    <span
-                      className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetReviewBadgeClassName(
-                        reviewStatus
-                      )}`}
-                    >
-                      {formatAssetReviewStatus(reviewStatus)}
-                    </span>
                   </div>
                   <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-400">
                     {asset.description || "No description provided."}
                   </p>
-                  <p className="mt-3 text-sm leading-6 text-slate-300">
-                    {asset.publishBlockedReasons?.[0] || getAssetPrimaryReadinessNote(asset)}
-                  </p>
+                  <div className="mt-4 rounded-[22px] border border-white/8 bg-white/[0.03] px-4 py-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                          Commercial state
+                        </p>
+                        <p className="mt-1 text-sm font-medium text-white">
+                          {publicationSummary.label}
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-slate-400">
+                          {publicationSummary.detail}
+                        </p>
+                      </div>
+                      <span
+                        className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] ${publicationSummary.badgeClassName}`}
+                      >
+                        {asset.status === "published" && asset.canPublish
+                          ? "Live"
+                          : asset.canPublish
+                            ? "Ready"
+                            : "Blocked"}
+                      </span>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <span
+                        className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetReviewBadgeClassName(
+                          reviewStatus
+                        )}`}
+                      >
+                        Review: {formatAssetReviewStatus(reviewStatus)}
+                      </span>
+                      <span
+                        className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetDeliveryBadgeClassName(
+                          deliveryStatus
+                        )}`}
+                      >
+                        Delivery: {formatAssetDeliveryStatus(deliveryStatus)}
+                      </span>
+                    </div>
+                  </div>
                   <div className="mt-4 flex flex-wrap items-center gap-4 text-xs uppercase tracking-[0.18em] text-slate-500">
                     <span>Added {formatDate(asset.createdAt)}</span>
                     <span>{licenseCount} licenses</span>
