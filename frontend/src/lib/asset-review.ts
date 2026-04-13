@@ -34,28 +34,31 @@ export const getAssetReviewBadgeClassName = (status: AssetReviewStatus | undefin
 
 export const getAssetReviewHelperCopy = (asset: Asset) => {
   if (asset.reviewStatus === "approved") {
-    return asset.reviewNote || "This asset has passed review and can move toward publication.";
+    return asset.reviewNote || "This asset has passed review and is eligible for publication.";
   }
 
   if (asset.reviewStatus === "in_review") {
-    return "This asset is currently in review and cannot go live until it is approved.";
+    return "This asset is currently under premium catalog review.";
   }
 
   if (asset.reviewStatus === "rejected") {
-    return asset.reviewNote || "This asset needs revisions before it can be submitted again.";
+    return asset.reviewNote || "This asset needs changes before it can enter the premium catalog.";
   }
 
-  return "Draft assets stay private until delivery is ready and review has been requested.";
+  return "This asset is still being prepared for review.";
 };
 
 export const getAssetPublishGateCopy = (asset: Asset) => {
   if (asset.status === "published" && asset.canPublish) {
-    return "Live in the marketplace.";
+    return "Live in marketplace";
   }
 
   if (asset.canPublish) {
-    return "Ready to publish once you decide to send it live.";
+    return "This asset is eligible for marketplace publication.";
   }
 
-  return asset.publishBlockedReasons?.[0] || "Publication is blocked until review and delivery requirements are satisfied.";
+  return (
+    asset.publishBlockedReasons?.[0] ||
+    "Only approved, delivery-ready assets are visible to buyers."
+  );
 };

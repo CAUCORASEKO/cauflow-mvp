@@ -279,24 +279,26 @@ const getDeliveryBlockerCopy = (note, context = "publish") => {
   }
 
   if (note === "Missing master delivery file") {
-    return `This asset still needs a valid master delivery file before it can be ${normalizedContext}.`;
+    return context === "submit"
+      ? "This asset must be delivery ready before it can be submitted for review."
+      : "Master delivery file is required for premium licensing.";
   }
 
   if (note === "Unsupported format") {
-    return `This asset needs a supported master delivery format before it can be ${normalizedContext}.`;
+    return `Unsupported file format. Use ${ALLOWED_ASSET_EXTENSIONS_LABEL}.`;
   }
 
   if (note === "Master file metadata is incomplete") {
-    return `This asset still needs complete master file metadata before it can be ${normalizedContext}.`;
+    return "Master file metadata is incomplete.";
   }
 
   if (note === "Resolution too low for premium delivery") {
-    return `This asset needs a higher-resolution master delivery file before it can be ${normalizedContext}.`;
+    return "Master file resolution is too low for premium delivery.";
   }
 
   return context === "submit"
     ? "This asset still needs delivery fixes before it can be submitted for review."
-    : "This asset still needs delivery fixes before it can go live in the marketplace.";
+    : "This asset still needs delivery fixes before it can go live.";
 };
 
 export const getAssetReviewSubmissionBlockedReasons = (deliveryReadiness) => {
@@ -317,7 +319,7 @@ export const getAssetPublishBlockedReasons = ({ reviewStatus, deliveryReadiness 
   }
 
   if (reviewStatus !== "approved") {
-    blockedReasons.push("This asset must be approved before it can go live in the marketplace.");
+    blockedReasons.push("This asset must be approved before it can be published.");
   }
 
   return blockedReasons;

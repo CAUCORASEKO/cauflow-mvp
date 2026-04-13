@@ -1,7 +1,15 @@
 import type { Asset, AssetDeliveryStatus, AssetFileRecord } from "@/types/api";
 
 export const assetDeliveryRulesCopy =
-  "Premium master files should be JPG, PNG, or WebP with at least a 2000px long edge and a 1400px short edge.";
+  "Technical checks confirm whether this asset is ready for premium licensing delivery.";
+
+export const assetDeliveryStandards = [
+  "Preview image uploaded",
+  "Master file uploaded",
+  "Supported format: JPG, PNG, or WebP",
+  "Minimum high-resolution master requirement",
+  "Readable technical metadata"
+] as const;
 
 export const formatAssetDeliveryStatus = (status: AssetDeliveryStatus | undefined) =>
   status === "delivery_ready" ? "Delivery ready" : "Needs fixes";
@@ -15,8 +23,7 @@ export const getAssetDeliveryTone = (asset: Asset) =>
   asset.deliveryReadiness?.isReady ? "success" : "error";
 
 export const getAssetPrimaryReadinessNote = (asset: Asset) =>
-  asset.deliveryReadiness?.notes?.[0] ||
-  "Assets need a valid premium file before they are ready for high-value licensing.";
+  asset.deliveryReadiness?.notes?.[0] || "Ready for premium licensing";
 
 export const getAssetPreviewUrl = (asset: Asset) =>
   asset.previewImageUrl || asset.previewFile?.url || asset.imageUrl || null;

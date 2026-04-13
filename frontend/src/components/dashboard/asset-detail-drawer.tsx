@@ -23,6 +23,7 @@ import {
 import { formatLicenseType, formatLicenseUsage } from "@/lib/license-taxonomy";
 import {
   assetDeliveryRulesCopy,
+  assetDeliveryStandards,
   formatAssetDeliveryStatus,
   getAssetDeliveryBadgeClassName,
   getAssetFileMetaRows,
@@ -32,6 +33,7 @@ import {
 import { formatCurrency, formatDate, formatFileSize } from "@/lib/utils";
 import type { Asset, AssetFileRecord, License, Purchase } from "@/types/api";
 import { ActionFeedback } from "@/components/dashboard/action-feedback";
+import { FormSection } from "@/components/dashboard/form-section";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -48,6 +50,22 @@ import {
   getAssetReviewHelperCopy
 } from "@/lib/asset-review";
 import { formatVisualAssetType, visualAssetTypeOptions } from "@/lib/visual-taxonomy";
+
+const reviewWorkflowStates = [
+  ["Draft", "This asset is still being prepared for review."],
+  ["In review", "This asset is currently under premium catalog review."],
+  ["Approved", "This asset has passed review and is eligible for publication."],
+  ["Rejected", "This asset needs changes before it can enter the premium catalog."]
+] as const;
+
+function GuidanceCard({ title, copy }: { title: string; copy: string }) {
+  return (
+    <div className="rounded-[22px] border border-white/8 bg-slate-950/45 p-4">
+      <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">{title}</p>
+      <p className="mt-3 text-sm leading-6 text-slate-300">{copy}</p>
+    </div>
+  );
+}
 
 function AssetFileCard({
   label,
@@ -345,7 +363,7 @@ export function AssetDetailDrawer({
       setReplacementPreviewImage(null);
       setReplacementMasterFile(null);
       setIsEditing(false);
-      setSaveFeedback("Asset metadata updated successfully.");
+      setSaveFeedback("Asset saved successfully.");
       onAssetUpdated(updatedAsset);
     } catch (submissionError) {
       setSaveError(
@@ -377,7 +395,13 @@ export function AssetDetailDrawer({
       setVisualType(updatedAsset.visualType);
       setStatus(updatedAsset.status);
       setReviewNote(updatedAsset.reviewNote || "");
-      setSaveFeedback(`Asset moved to ${formatCatalogStatus(nextStatus).toLowerCase()}.`);
+      setSaveFeedback(
+        nextStatus === "published"
+          ? "Asset published successfully."
+          : nextStatus === "draft"
+            ? "Asset moved back to draft."
+            : `Asset moved to ${formatCatalogStatus(nextStatus).toLowerCase()}.`
+      );
       onAssetUpdated(updatedAsset);
     } catch (submissionError) {
       setSaveError(
@@ -434,10 +458,10 @@ export function AssetDetailDrawer({
       setReviewNote(updatedAsset.reviewNote || "");
       setSaveFeedback(
         nextReviewStatus === "approved"
-          ? "Asset approved."
+          ? "Asset approved and ready for publication."
           : nextReviewStatus === "rejected"
-            ? "Asset rejected with review notes."
-            : "Asset returned to draft."
+            ? "Asset rejected. Review note saved."
+            : "Asset moved back to draft."
       );
       onAssetUpdated(updatedAsset);
     } catch (submissionError) {
@@ -602,216 +626,13 @@ export function AssetDetailDrawer({
                 </div>
               </div>
 
-              <section className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
-                <div className="mb-5 rounded-[22px] border border-white/8 bg-slate-950/45 p-4">
-                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span
-                          className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getCatalogStatusBadgeClassName(
-                            asset.status
-                          )}`}
-                        >
-                          {formatCatalogStatus(asset.status)}
-                        </span>
-                        <span
-                          className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetReviewBadgeClassName(
-                            reviewStatus
-                          )}`}
-                        >
-                          {formatAssetReviewStatus(reviewStatus)}
-                        </span>
-                      </div>
-                      <p className="mt-3 text-sm leading-6 text-slate-300">
-                        {getCatalogStatusHelperCopy(asset.status, "This asset")}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {asset.status !== "published" ? (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          disabled={isSaving}
-                          onClick={() => void handleStatusChange("published")}
-                        >
-                          Publish
-                        </Button>
-                      ) : (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          disabled={isSaving}
-                          onClick={() => void handleStatusChange("draft")}
-                        >
-                          Unpublish
-                        </Button>
-                      )}
-                      {asset.status !== "archived" ? (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          className="border-amber-300/20 bg-amber-300/[0.08] text-amber-100 hover:bg-amber-300/[0.14]"
-                          disabled={isSaving}
-                          onClick={() => void handleStatusChange("archived")}
-                        >
-                          Archive
-                        </Button>
-                      ) : (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          disabled={isSaving}
-                          onClick={() => void handleStatusChange("draft")}
-                        >
-                          Restore
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mb-5 rounded-[22px] border border-white/8 bg-slate-950/45 p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
-                        Publish gate
-                      </p>
-                      <p className="mt-2 text-sm text-white">{publishGateCopy}</p>
-                    </div>
-                    <span
-                      className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${
-                        asset.canPublish
-                          ? "border-emerald-400/20 bg-emerald-400/[0.08] text-emerald-100"
-                          : "border-amber-300/18 bg-amber-300/[0.08] text-amber-100"
-                      }`}
-                    >
-                      {asset.canPublish ? "Publish eligible" : "Publish blocked"}
-                    </span>
-                  </div>
-                  {publishBlockedReasons.length > 0 ? (
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {publishBlockedReasons.map((reason) => (
-                        <span
-                          key={reason}
-                          className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-300"
-                        >
-                          {reason}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="mb-5 rounded-[22px] border border-white/8 bg-slate-950/45 p-4">
-                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div>
-                      <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
-                        Review workflow
-                      </p>
-                      <p className="mt-2 text-sm text-white">{reviewHelperCopy}</p>
-                      <p className="mt-3 text-sm leading-6 text-slate-400">
-                        Temporary internal review controls are exposed here until a dedicated moderation workspace exists.
-                      </p>
-                    </div>
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/8 bg-white/[0.04] text-sky-200">
-                      <Stamp className="h-5 w-5" />
-                    </div>
-                  </div>
-
-                  <div className="mt-4 space-y-3">
-                    <div className="rounded-[20px] border border-white/8 bg-black/20 p-4">
-                      <label className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
-                        Review note
-                      </label>
-                      <Textarea
-                        className="mt-3 min-h-[132px]"
-                        value={reviewNote}
-                        onChange={(event) => setReviewNote(event.target.value)}
-                        placeholder="Add approval context or explain what still needs to be fixed."
-                      />
-                    </div>
-
-                    {reviewStatus !== "approved" ? (
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          className="gap-2"
-                          disabled={!canSubmitForReview || isSubmittingReview || isUpdatingReview}
-                          onClick={() => void handleSubmitForReview()}
-                        >
-                          <Send className="h-4 w-4" />
-                          {isSubmittingReview ? "Submitting..." : "Submit for review"}
-                        </Button>
-
-                        {reviewStatus === "in_review" ? (
-                          <>
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              className="gap-2 border-emerald-400/20 bg-emerald-400/[0.08] text-emerald-100 hover:bg-emerald-400/[0.14]"
-                              disabled={isUpdatingReview || isSubmittingReview}
-                              onClick={() => void handleReviewDecision("approved")}
-                            >
-                              <ShieldCheck className="h-4 w-4" />
-                              {isUpdatingReview ? "Saving..." : "Approve"}
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              className="gap-2 border-rose-400/18 bg-rose-400/[0.08] text-rose-100 hover:bg-rose-400/[0.14]"
-                              disabled={isUpdatingReview || isSubmittingReview}
-                              onClick={() => void handleReviewDecision("rejected")}
-                            >
-                              <X className="h-4 w-4" />
-                              {isUpdatingReview ? "Saving..." : "Reject"}
-                            </Button>
-                          </>
-                        ) : null}
-
-                        {reviewStatus === "rejected" ? (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            className="gap-2"
-                            disabled={isUpdatingReview || isSubmittingReview}
-                            onClick={() => void handleReviewDecision("draft")}
-                          >
-                            <RotateCcw className="h-4 w-4" />
-                            Return to draft
-                          </Button>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          className="gap-2"
-                          disabled={isUpdatingReview}
-                          onClick={() => void handleReviewDecision("draft")}
-                        >
-                          <RotateCcw className="h-4 w-4" />
-                          Return to draft
-                        </Button>
-                      </div>
-                    )}
-
-                    {!canSubmitForReview && reviewStatus !== "in_review" && reviewStatus !== "approved" ? (
-                      <p className="text-sm leading-6 text-slate-400">
-                        {readinessNotes[0] ||
-                          "Resolve delivery requirements before requesting review."}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="flex items-center gap-2 text-slate-300">
-                    <Sparkles className="h-4 w-4 text-sky-200" />
-                    <span className="text-sm font-medium">Metadata workspace</span>
-                  </div>
-                  {!isEditing ? (
+              <FormSection
+                step="01"
+                eyebrow="Asset Basics"
+                title="Asset basics"
+                description="Define the core identity and commercial positioning of this visual asset."
+                aside={
+                  !isEditing ? (
                     <Button
                       type="button"
                       variant="secondary"
@@ -830,91 +651,59 @@ export function AssetDetailDrawer({
                       <PencilLine className="h-4 w-4" />
                       Edit asset
                     </Button>
-                  ) : null}
-                </div>
-
+                  ) : (
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <Sparkles className="h-4 w-4 text-sky-200" />
+                      <span className="text-sm font-medium">Editing asset</span>
+                    </div>
+                  )
+                }
+              >
                 {!isEditing ? (
-                  <div className="mt-4 space-y-4">
+                  <div className="grid gap-4">
                     <div className="rounded-[22px] border border-white/8 bg-slate-950/45 p-4">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
-                            Delivery readiness
-                          </p>
-                          <p className="mt-2 text-sm text-white">
-                            {getAssetPrimaryReadinessNote(asset)}
-                          </p>
-                        </div>
-                        <span
-                          className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetDeliveryBadgeClassName(
-                            readinessStatus
-                          )}`}
-                        >
-                          {formatAssetDeliveryStatus(readinessStatus)}
-                        </span>
-                      </div>
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {readinessNotes.map((note) => (
-                          <span
-                            key={note}
-                            className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-300"
-                          >
-                            {note}
-                          </span>
-                        ))}
-                      </div>
-                      <p className="mt-4 text-sm leading-6 text-slate-400">
-                        {assetDeliveryRulesCopy}
+                      <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                        Asset title
+                      </p>
+                      <p className="mt-2 text-sm text-white">{asset.title}</p>
+                      <p className="mt-2 text-sm leading-6 text-slate-400">
+                        Use a concise commercial title buyers can recognize easily.
                       </p>
                     </div>
-                    <div className="rounded-[22px] border border-white/8 bg-slate-950/45 p-4">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
-                            Review note
-                          </p>
-                          <p className="mt-2 text-sm text-white">
-                            {asset.reviewNote || "No decision note has been recorded yet."}
-                          </p>
-                        </div>
-                        <span
-                          className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetReviewBadgeClassName(
-                            reviewStatus
-                          )}`}
-                        >
-                          {formatAssetReviewStatus(reviewStatus)}
-                        </span>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="rounded-[22px] border border-white/8 bg-slate-950/45 p-4">
+                        <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                          Visual category
+                        </p>
+                        <p className="mt-2 text-sm text-white">
+                          {formatVisualAssetType(asset.visualType)}
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-slate-400">
+                          This helps buyers understand the visual discipline of the asset in
+                          marketplace and licensing surfaces.
+                        </p>
+                      </div>
+                      <div className="rounded-[22px] border border-white/8 bg-slate-950/45 p-4">
+                        <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                          Created
+                        </p>
+                        <p className="mt-2 text-sm text-white">{formatDate(asset.createdAt)}</p>
+                        <p className="mt-2 text-sm leading-6 text-slate-400">
+                          Asset #{asset.id}
+                        </p>
                       </div>
                     </div>
-                    <AssetFileCard
-                      label="Preview image"
-                      helper="Shown in workspace and marketplace surfaces."
-                      file={asset.previewFile}
-                      fallback="No preview image uploaded"
-                    />
-                    <AssetFileCard
-                      label="Master delivery file"
-                      helper="Original or premium file reserved for later buyer download."
-                      file={asset.masterFile}
-                      fallback="No master delivery file uploaded"
-                    />
-                    <div>
+                    <div className="rounded-[22px] border border-white/8 bg-slate-950/45 p-4">
                       <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
-                        Created
-                      </p>
-                      <p className="mt-2 text-sm text-white">{formatDate(asset.createdAt)}</p>
-                    </div>
-                    <div>
-                      <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
-                        Description
+                        Licensing description
                       </p>
                       <p className="mt-2 text-sm leading-7 text-slate-300">
-                        {asset.description || "No descriptive metadata has been added yet."}
+                        {asset.description || "No licensing description has been added yet."}
                       </p>
                     </div>
                   </div>
                 ) : (
-                  <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
+                  <form className="space-y-4" onSubmit={handleSubmit}>
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-slate-200">Lifecycle</label>
                       <Select
@@ -927,9 +716,7 @@ export function AssetDetailDrawer({
                         <option value="archived">Archived</option>
                       </Select>
                       <p className="text-sm leading-6 text-slate-400">
-                        Publish is only allowed after approval and delivery readiness. Draft hides
-                        this asset from buyer-facing marketplace. Archived preserves history while
-                        removing it from active circulation.
+                        Only approved, delivery-ready assets are visible to buyers.
                       </p>
                     </div>
                     <div className="space-y-2">
@@ -937,14 +724,15 @@ export function AssetDetailDrawer({
                       <Input
                         value={title}
                         onChange={(event) => setTitle(event.target.value)}
-                        placeholder="Asset title"
+                        placeholder="Premium campaign stills"
                         required
                       />
+                      <p className="text-sm leading-6 text-slate-400">
+                        Use a concise commercial title buyers can recognize easily.
+                      </p>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-slate-200">
-                        Visual category
-                      </label>
+                      <label className="text-sm font-medium text-slate-200">Visual category</label>
                       <Select
                         value={visualType}
                         onChange={(event) =>
@@ -959,52 +747,28 @@ export function AssetDetailDrawer({
                         ))}
                       </Select>
                       <p className="text-sm leading-6 text-slate-400">
-                        Describe the visual format or creative discipline of this asset. This
-                        appears in marketplace and licensing surfaces.
+                        This helps buyers understand the visual discipline of the asset in
+                        marketplace and licensing surfaces.
                       </p>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-slate-200">Description</label>
+                      <label className="text-sm font-medium text-slate-200">
+                        Licensing description
+                      </label>
                       <Textarea
                         value={description}
                         onChange={(event) => setDescription(event.target.value)}
-                        placeholder="Add stronger catalog context for this asset."
+                        placeholder="Describe the creative context and intended commercial value of this asset."
                       />
-                    </div>
-
-                    <div className="rounded-[22px] border border-sky-300/12 bg-sky-300/[0.05] p-4">
-                      <p className="text-[11px] uppercase tracking-[0.18em] text-sky-100/80">
-                        Delivery readiness
-                      </p>
-                      <p className="mt-2 text-sm text-white">
-                        {getAssetPrimaryReadinessNote(asset)}
-                      </p>
-                      <p className="mt-2 text-sm leading-6 text-slate-300">
-                        {assetDeliveryRulesCopy}
+                      <p className="text-sm leading-6 text-slate-400">
+                        Describe the creative context and intended commercial value of the asset.
                       </p>
                     </div>
-
-                    <AssetFileCard
-                      label="Preview image"
-                      helper="Shown in workspace and marketplace surfaces."
-                      file={previewDraftFile}
-                      fallback="Keep existing preview image"
-                      ctaLabel={replacementPreviewImage ? "Replace again" : "Choose image"}
-                      onChange={setReplacementPreviewImage}
-                    />
-                    <AssetFileCard
-                      label="Master delivery file"
-                      helper="Unlocked later for licensed buyers."
-                      file={masterDraftFile}
-                      fallback="Upload a premium delivery file"
-                      ctaLabel={replacementMasterFile ? "Replace again" : "Choose master"}
-                      onChange={setReplacementMasterFile}
-                    />
 
                     {isSaving ? (
                       <ActionFeedback
                         tone="pending"
-                        message="Saving asset changes"
+                        message="Saving asset..."
                         detail="Metadata, preview, and master delivery details are being updated against the live API."
                       />
                     ) : null}
@@ -1028,12 +792,332 @@ export function AssetDetailDrawer({
                       </Button>
                       <Button type="submit" className="gap-2" disabled={isSaving}>
                         {isSaving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
-                        {isSaving ? "Saving..." : "Save changes"}
+                        {isSaving ? "Saving asset..." : "Save changes"}
                       </Button>
                     </div>
                   </form>
                 )}
-              </section>
+              </FormSection>
+
+              <FormSection
+                step="02"
+                eyebrow="Files"
+                title="Files"
+                description="Upload both the public preview and the premium delivery file. Buyers see the preview first, but licensed buyers unlock the master file after purchase."
+              >
+                <div className="grid gap-4">
+                  <AssetFileCard
+                    label="Preview image"
+                    helper="Shown in workspace and marketplace surfaces. Use a polished catalog-ready image that represents the asset clearly."
+                    file={isEditing ? previewDraftFile : asset.previewFile}
+                    fallback={isEditing ? "Keep existing preview image" : "No preview image uploaded"}
+                    ctaLabel={isEditing ? (replacementPreviewImage ? "Replace preview" : "Choose preview") : undefined}
+                    onChange={isEditing ? setReplacementPreviewImage : undefined}
+                  />
+                  <AssetFileCard
+                    label="Master delivery file"
+                    helper="Unlocked later for licensed buyers as the premium delivery file. Upload the final high-resolution version you want to deliver commercially after successful purchase."
+                    file={isEditing ? masterDraftFile : asset.masterFile}
+                    fallback={isEditing ? "Upload a premium delivery file" : "No master delivery file uploaded"}
+                    ctaLabel={isEditing ? (replacementMasterFile ? "Replace master" : "Choose master") : undefined}
+                    onChange={isEditing ? setReplacementMasterFile : undefined}
+                  />
+                </div>
+              </FormSection>
+
+              <FormSection
+                step="03"
+                eyebrow="Delivery Readiness"
+                title="Delivery readiness"
+                description={assetDeliveryRulesCopy}
+              >
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr),minmax(220px,0.9fr)]">
+                  <div className="rounded-[22px] border border-white/8 bg-slate-950/45 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                          Current state
+                        </p>
+                        <p className="mt-2 text-sm text-white">
+                          {getAssetPrimaryReadinessNote(asset)}
+                        </p>
+                      </div>
+                      <span
+                        className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetDeliveryBadgeClassName(
+                          readinessStatus
+                        )}`}
+                      >
+                        {formatAssetDeliveryStatus(readinessStatus)}
+                      </span>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {readinessNotes.map((note) => (
+                        <span
+                          key={note}
+                          className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-300"
+                        >
+                          {note}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-[22px] border border-sky-300/12 bg-sky-300/[0.05] p-4">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-sky-100/80">
+                      Current premium delivery standard
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {assetDeliveryStandards.map((item) => (
+                        <span
+                          key={item}
+                          className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-200"
+                        >
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </FormSection>
+
+              <FormSection
+                step="04"
+                eyebrow="Review Workflow"
+                title="Review workflow"
+                description="Only delivery-ready assets can move into premium review. Only approved assets can be published."
+                aside={
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/8 bg-white/[0.04] text-sky-200">
+                    <Stamp className="h-5 w-5" />
+                  </div>
+                }
+              >
+                <div className="space-y-4">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {reviewWorkflowStates.map(([label, helper]) => (
+                      <div
+                        key={label}
+                        className="rounded-[22px] border border-white/8 bg-slate-950/45 p-4"
+                      >
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                          {label}
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-slate-300">{helper}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="rounded-[22px] border border-white/8 bg-slate-950/45 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                          Current review state
+                        </p>
+                        <p className="mt-2 text-sm text-white">{reviewHelperCopy}</p>
+                      </div>
+                      <span
+                        className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetReviewBadgeClassName(
+                          reviewStatus
+                        )}`}
+                      >
+                        {formatAssetReviewStatus(reviewStatus)}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 rounded-[20px] border border-white/8 bg-black/20 p-4">
+                      <label className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                        Review note
+                      </label>
+                      <Textarea
+                        className="mt-3 min-h-[132px]"
+                        value={reviewNote}
+                        onChange={(event) => setReviewNote(event.target.value)}
+                        placeholder="Use this to record approval context or explain rejection clearly."
+                      />
+                      <p className="mt-2 text-sm leading-6 text-slate-400">
+                        Add a review note before rejecting this asset.
+                      </p>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {reviewStatus !== "approved" ? (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="gap-2"
+                          disabled={!canSubmitForReview || isSubmittingReview || isUpdatingReview}
+                          onClick={() => void handleSubmitForReview()}
+                        >
+                          <Send className="h-4 w-4" />
+                          {isSubmittingReview ? "Submitting..." : "Submit for review"}
+                        </Button>
+                      ) : null}
+
+                      {reviewStatus === "in_review" ? (
+                        <>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            className="gap-2 border-emerald-400/20 bg-emerald-400/[0.08] text-emerald-100 hover:bg-emerald-400/[0.14]"
+                            disabled={isUpdatingReview || isSubmittingReview}
+                            onClick={() => void handleReviewDecision("approved")}
+                          >
+                            <ShieldCheck className="h-4 w-4" />
+                            {isUpdatingReview ? "Saving..." : "Approve"}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            className="gap-2 border-rose-400/18 bg-rose-400/[0.08] text-rose-100 hover:bg-rose-400/[0.14]"
+                            disabled={isUpdatingReview || isSubmittingReview}
+                            onClick={() => void handleReviewDecision("rejected")}
+                          >
+                            <X className="h-4 w-4" />
+                            {isUpdatingReview ? "Saving..." : "Reject"}
+                          </Button>
+                        </>
+                      ) : null}
+
+                      {(reviewStatus === "rejected" || reviewStatus === "approved") ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="gap-2"
+                          disabled={isUpdatingReview || isSubmittingReview}
+                          onClick={() => void handleReviewDecision("draft")}
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                          Return to draft
+                        </Button>
+                      ) : null}
+                    </div>
+
+                    {!canSubmitForReview &&
+                    reviewStatus !== "in_review" &&
+                    reviewStatus !== "approved" ? (
+                      <p className="mt-4 text-sm leading-6 text-slate-400">
+                        {readinessNotes[0] ||
+                          "This asset must be delivery ready before it can be submitted for review."}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              </FormSection>
+
+              <FormSection
+                step="05"
+                eyebrow="Publication Status"
+                title="Publication status"
+                description="Published assets are visible to buyers only when they are both approved and delivery ready."
+              >
+                <div className="space-y-4">
+                  <div className="rounded-[22px] border border-white/8 bg-slate-950/45 p-4">
+                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getCatalogStatusBadgeClassName(
+                              asset.status
+                            )}`}
+                          >
+                            {formatCatalogStatus(asset.status)}
+                          </span>
+                          <span
+                            className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetReviewBadgeClassName(
+                              reviewStatus
+                            )}`}
+                          >
+                            {formatAssetReviewStatus(reviewStatus)}
+                          </span>
+                        </div>
+                        <p className="mt-3 text-sm text-white">{publishGateCopy}</p>
+                        <p className="mt-2 text-sm leading-6 text-slate-400">
+                          {getCatalogStatusHelperCopy(asset.status, "This asset")}
+                        </p>
+                      </div>
+                      <span
+                        className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${
+                          asset.canPublish
+                            ? "border-emerald-400/20 bg-emerald-400/[0.08] text-emerald-100"
+                            : "border-amber-300/18 bg-amber-300/[0.08] text-amber-100"
+                        }`}
+                      >
+                        {asset.canPublish ? "Publish eligible" : "Publish blocked"}
+                      </span>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {(publishBlockedReasons.length > 0
+                        ? publishBlockedReasons
+                        : ["This asset is eligible for marketplace publication."]).map((reason) => (
+                        <span
+                          key={reason}
+                          className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-300"
+                        >
+                          {reason}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {asset.status !== "published" ? (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={isSaving}
+                        onClick={() => void handleStatusChange("published")}
+                      >
+                        Publish
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={isSaving}
+                        onClick={() => void handleStatusChange("draft")}
+                      >
+                        Unpublish
+                      </Button>
+                    )}
+                    {asset.status !== "archived" ? (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="border-amber-300/20 bg-amber-300/[0.08] text-amber-100 hover:bg-amber-300/[0.14]"
+                        disabled={isSaving}
+                        onClick={() => void handleStatusChange("archived")}
+                      >
+                        Archive
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        disabled={isSaving}
+                        onClick={() => void handleStatusChange("draft")}
+                      >
+                        Restore
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </FormSection>
+
+              <FormSection
+                step="06"
+                eyebrow="Creator Guidance"
+                title="Creator guidance"
+                description="Keep the marketplace presentation clear and reserve the premium file for licensed delivery."
+              >
+                <div className="grid gap-4">
+                  <GuidanceCard
+                    title="What buyers unlock"
+                    copy="Buyers first see the preview image in marketplace surfaces. After successful purchase and an active entitlement, they unlock the premium master file."
+                  />
+                  <GuidanceCard
+                    title="How to prepare a premium asset"
+                    copy="Export your final AI artwork in a high-resolution delivery format before uploading it as the master file. Use the preview image for catalog presentation and the master file for commercial delivery."
+                  />
+                </div>
+              </FormSection>
 
               <section className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
                 <div className="flex items-center gap-2 text-slate-300">

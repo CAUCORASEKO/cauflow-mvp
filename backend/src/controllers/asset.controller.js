@@ -196,7 +196,7 @@ export const uploadAsset = async (req, res) => {
       await cleanupUploadedRequestFiles(req);
 
       return res.status(400).json({
-        message: "preview image is required"
+        message: "Preview image is required."
       });
     }
 
@@ -520,7 +520,7 @@ export const updateAsset = async (req, res) => {
     }
 
     res.status(200).json({
-      message: "Asset updated successfully",
+      message: "Asset saved successfully.",
       data: normalizeResponseData(serializeAssetRecord(updatedAssetResult.rows[0]))
     });
   } catch (error) {
@@ -703,7 +703,7 @@ export const submitAssetForReview = async (req, res) => {
     );
 
     res.status(200).json({
-      message: "Asset submitted for review",
+      message: "Asset submitted for review.",
       data: normalizeResponseData(serializeAssetRecord(result.rows[0]))
     });
   } catch (error) {
@@ -734,13 +734,13 @@ export const updateAssetReview = async (req, res) => {
 
     if (reviewStatus === "in_review") {
       return res.status(400).json({
-        message: "Use submit for review to move an asset into review"
+        message: "Use submit for review to move this asset into review."
       });
     }
 
     if (reviewStatus === "rejected" && !reviewNote) {
       return res.status(400).json({
-        message: "A review note is required when rejecting an asset"
+        message: "Add a review note before rejecting this asset."
       });
     }
 
@@ -773,7 +773,12 @@ export const updateAssetReview = async (req, res) => {
     );
 
     res.status(200).json({
-      message: "Asset review updated",
+      message:
+        reviewStatus === "approved"
+          ? "Asset approved and ready for publication."
+          : reviewStatus === "rejected"
+            ? "Asset rejected. Review note saved."
+            : "Asset moved back to draft.",
       data: normalizeResponseData(serializeAssetRecord(result.rows[0]))
     });
   } catch (error) {
