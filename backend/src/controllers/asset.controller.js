@@ -726,11 +726,36 @@ export const updateAssetReview = async (req, res) => {
     }
 
     const asset = assetResult.rows[0];
-    const reviewStatus = normalizeAssetReviewStatus(req.body.reviewStatus);
     const reviewNote =
       typeof req.body.reviewNote === "string" && req.body.reviewNote.trim().length > 0
         ? req.body.reviewNote.trim()
         : null;
+    const hasReviewStatus = Object.prototype.hasOwnProperty.call(req.body, "reviewStatus");
+
+    if (!hasReviewStatus) {
+      if (typeof req.body.reviewNote !== "string") {
+        return res.status(400).json({
+          message: "reviewStatus is required unless updating reviewNote only."
+        });
+      }
+
+      const noteResult = await pool.query(
+        `
+        UPDATE assets
+        SET review_note = $1
+        WHERE id = $2
+        RETURNING *
+        `,
+        [reviewNote, assetId]
+      );
+
+      return res.status(200).json({
+        message: reviewNote ? "Review note saved." : "Review note cleared.",
+        data: normalizeResponseData(serializeAssetRecord(noteResult.rows[0]))
+      });
+    }
+
+    const reviewStatus = normalizeAssetReviewStatus(req.body.reviewStatus);
 
     if (reviewStatus === "in_review") {
       return res.status(400).json({

@@ -369,8 +369,12 @@ export function SettingsPage() {
   );
 
   if (user.role !== "creator") {
+    const title = user.role === "admin" ? "Account settings" : "Settings";
+    const subtitle =
+      user.role === "admin" ? "Personal admin account controls" : "Account and business";
+
     return (
-      <AppShell title="Settings" subtitle="Account and business" navItems={navItems}>
+      <AppShell title={title} subtitle={subtitle} navItems={navItems}>
         {message ? <ActionFeedback tone="success" message={message} /> : null}
         {errorMessage ? <ActionFeedback tone="error" message={errorMessage} /> : null}
         <div className="grid gap-5">

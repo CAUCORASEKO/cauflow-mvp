@@ -81,6 +81,13 @@ export interface License {
   policy?: LicensePolicy | null;
 }
 
+export interface AdminLicenseRecord extends License {
+  asset?: Asset | null;
+  creator?: AccountSummary | null;
+  purchaseCount: number;
+  activeGrantCount: number;
+}
+
 export interface Purchase {
   id: number;
   licenseId: number;
@@ -289,6 +296,106 @@ export interface RoleDashboard {
   recentPurchases?: Purchase[];
   recentPayments?: PaymentRecord[];
   quickActions: string[];
+}
+
+export interface AdminOverview {
+  metrics: {
+    totalUsersCount: number;
+    assetsCount: number;
+    draftAssets: number;
+    assetsPendingReview: number;
+    rejectedAssetsCount: number;
+    publishedAssets: number;
+    archivedAssets: number;
+    packsCount: number;
+    licensesCount: number;
+    creatorsCount: number;
+    buyersCount: number;
+    purchasesCount: number;
+    paidPurchasesCount: number;
+    pendingPurchasesCount: number;
+    activeLicenseGrantsCount: number;
+  };
+  reviewQueue: Asset[];
+  recentPurchases: Purchase[];
+}
+
+export interface AdminReviewQueueSnapshot {
+  summary: {
+    inReviewCount: number;
+    deliveryReadyCount: number;
+    blockedCount: number;
+  };
+  assets: Asset[];
+}
+
+export interface AdminCatalogSnapshot {
+  summary: {
+    assetsCount: number;
+    assetDraftCount: number;
+    assetPublishedCount: number;
+    assetArchivedCount: number;
+    inReviewCount: number;
+    rejectedCount: number;
+    packsCount: number;
+    licensesCount: number;
+  };
+  assets: Asset[];
+  packs: Pack[];
+  licenses: AdminLicenseRecord[];
+}
+
+export interface AdminUserRecord {
+  id: number;
+  email: string;
+  role: UserRole;
+  accountStatus: AccountStatus;
+  emailVerified: boolean;
+  publicDisplayName: string | null;
+  avatarUrl: string | null;
+  organizationName: string | null;
+  studioName: string | null;
+  country: string | null;
+  preferredCurrency: string | null;
+  walletConnectionStatus: WalletConnectionStatus;
+  onboardingCompleted?: boolean;
+  payoutOnboardingStatus?: PayoutOnboardingStatus;
+  createdAt: string;
+  updatedAt: string;
+  assetCount: number;
+  packCount: number;
+  buyerPurchaseCount: number;
+  creatorSaleCount: number;
+  entitlementCount: number;
+}
+
+export interface AdminUsersSnapshot {
+  summary: {
+    totalUsers: number;
+    creatorsCount: number;
+    buyersCount: number;
+    adminsCount: number;
+    verifiedCount: number;
+    closedCount: number;
+    restrictedCount: number;
+  };
+  users: AdminUserRecord[];
+}
+
+export interface AdminCommerceRecord extends Purchase {
+  grantStatus: LicenseGrant["status"] | null;
+  downloadAccess: boolean | null;
+}
+
+export interface AdminCommerceSnapshot {
+  summary: {
+    purchasesCount: number;
+    paidPurchasesCount: number;
+    pendingPurchasesCount: number;
+    refundedPurchasesCount: number;
+    activeGrantsCount: number;
+  };
+  purchases: AdminCommerceRecord[];
 }
 
 export interface ApiResponse<T> {

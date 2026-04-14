@@ -20,13 +20,10 @@ export const buyerNav = [
 
 export const adminNav = [
   { label: "Overview", href: "/app/admin" },
+  { label: "Review queue", href: "/app/admin/review" },
+  { label: "Catalog", href: "/app/admin/catalog" },
   { label: "Users", href: "/app/admin/users" },
-  { label: "Assets", href: "/app/admin/assets" },
-  { label: "Packs", href: "/app/admin/packs" },
-  { label: "Licenses", href: "/app/admin/licenses" },
-  { label: "Payments", href: "/app/admin/payments" },
-  { label: "Payouts", href: "/app/admin/payouts" },
-  { label: "Settings", href: "/app/settings" }
+  { label: "Purchases", href: "/app/admin/commerce" }
 ];
 
 export const getRoleHomePath = (role: UserRole) =>

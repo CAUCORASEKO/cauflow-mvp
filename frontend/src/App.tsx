@@ -3,8 +3,11 @@ import { ProtectedRoute } from "@/components/auth/protected-route";
 import { useAuth } from "@/contexts/auth-context";
 import { getAuthenticatedHomePath } from "@/lib/platform-nav";
 import { ActiveLicensesPage } from "./pages/active-licenses-page";
+import { AdminCatalogPage } from "./pages/admin-catalog-page";
+import { AdminCommercePage } from "./pages/admin-commerce-page";
 import { AdminHomePage } from "./pages/admin-home-page";
-import { AdminResourcePage } from "./pages/admin-resource-page";
+import { AdminReviewQueuePage } from "./pages/admin-review-queue-page";
+import { AdminUsersPage } from "./pages/admin-users-page";
 import { BuyerHomePage } from "./pages/buyer-home-page";
 import { CheckoutPage } from "./pages/checkout-page";
 import { CreatorHomePage } from "./pages/creator-home-page";
@@ -61,30 +64,10 @@ function App() {
 
       <Route element={<ProtectedRoute roles={["admin"]} />}>
         <Route path="/app/admin" element={<AdminHomePage />} />
-        <Route
-          path="/app/admin/users"
-          element={<AdminResourcePage title="Users" copy="Platform user review and moderation entry point." />}
-        />
-        <Route
-          path="/app/admin/assets"
-          element={<AdminResourcePage title="Assets" copy="Review platform assets and moderation states." />}
-        />
-        <Route
-          path="/app/admin/packs"
-          element={<AdminResourcePage title="Packs" copy="Review published packs, monetization states, and catalog quality." />}
-        />
-        <Route
-          path="/app/admin/licenses"
-          element={<AdminResourcePage title="Licenses" copy="Audit license templates, activation states, and rights policy health." />}
-        />
-        <Route
-          path="/app/admin/payments"
-          element={<AdminResourcePage title="Payments" copy="Monitor payment statuses, failed checkouts, refunds, and disputes." />}
-        />
-        <Route
-          path="/app/admin/payouts"
-          element={<AdminResourcePage title="Payouts" copy="Monitor creator payout readiness, Connect onboarding, and blocked monetization states." />}
-        />
+        <Route path="/app/admin/review" element={<AdminReviewQueuePage />} />
+        <Route path="/app/admin/catalog" element={<AdminCatalogPage />} />
+        <Route path="/app/admin/users" element={<AdminUsersPage />} />
+        <Route path="/app/admin/commerce" element={<AdminCommercePage />} />
       </Route>
     </Routes>
   );

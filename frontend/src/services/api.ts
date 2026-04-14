@@ -1,5 +1,10 @@
 import type {
   Account,
+  AdminCatalogSnapshot,
+  AdminCommerceSnapshot,
+  AdminOverview,
+  AdminReviewQueueSnapshot,
+  AdminUsersSnapshot,
   ApiResponse,
   Asset,
   ExploreFeed,
@@ -199,7 +204,7 @@ export const submitAssetForReview = async (assetId: number) => {
 export const updateAssetReview = async (
   assetId: number,
   input: {
-    reviewStatus: Asset["reviewStatus"];
+    reviewStatus?: Asset["reviewStatus"];
     reviewNote?: string;
   }
 ) => {
@@ -614,6 +619,46 @@ export const fetchRoleDashboard = async () => {
   });
 
   return handleResponse<RoleDashboard>(response);
+};
+
+export const fetchAdminOverview = async () => {
+  const response = await fetch(`${API_BASE_URL}/admin/overview`, {
+    headers: getAuthHeaders()
+  });
+
+  return handleResponse<AdminOverview>(response);
+};
+
+export const fetchAdminReviewQueue = async () => {
+  const response = await fetch(`${API_BASE_URL}/admin/review-queue`, {
+    headers: getAuthHeaders()
+  });
+
+  return handleResponse<AdminReviewQueueSnapshot>(response);
+};
+
+export const fetchAdminCatalog = async () => {
+  const response = await fetch(`${API_BASE_URL}/admin/catalog`, {
+    headers: getAuthHeaders()
+  });
+
+  return handleResponse<AdminCatalogSnapshot>(response);
+};
+
+export const fetchAdminUsers = async () => {
+  const response = await fetch(`${API_BASE_URL}/admin/users`, {
+    headers: getAuthHeaders()
+  });
+
+  return handleResponse<AdminUsersSnapshot>(response);
+};
+
+export const fetchAdminCommerce = async () => {
+  const response = await fetch(`${API_BASE_URL}/admin/commerce`, {
+    headers: getAuthHeaders()
+  });
+
+  return handleResponse<AdminCommerceSnapshot>(response);
 };
 
 export const fetchEntitlements = async () => {
