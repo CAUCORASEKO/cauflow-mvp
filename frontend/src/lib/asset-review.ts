@@ -33,6 +33,10 @@ export const getAssetReviewBadgeClassName = (status: AssetReviewStatus | undefin
 };
 
 export const getAssetReviewHelperCopy = (asset: Asset) => {
+  if (asset.offerClass === "free_use") {
+    return "This asset is on the free-use path and does not require premium review.";
+  }
+
   if (asset.reviewStatus === "approved") {
     return asset.reviewNote || "This asset has passed review and is eligible for publication.";
   }
@@ -50,15 +54,19 @@ export const getAssetReviewHelperCopy = (asset: Asset) => {
 
 export const getAssetPublishGateCopy = (asset: Asset) => {
   if (asset.status === "published" && asset.canPublish) {
-    return "Live in marketplace";
+    return asset.offerClass === "free_use" ? "Live as free-use offer" : "Live in marketplace";
   }
 
   if (asset.canPublish) {
-    return "This asset is eligible for marketplace publication.";
+    return asset.offerClass === "free_use"
+      ? "This asset is eligible for free-use publication."
+      : "This asset is eligible for marketplace publication.";
   }
 
   return (
     asset.publishBlockedReasons?.[0] ||
-    "Only approved, delivery-ready assets are visible to buyers."
+    (asset.offerClass === "free_use"
+      ? "Free-use assets need a valid preview before they are visible to buyers."
+      : "Only approved, delivery-ready assets are visible to buyers.")
   );
 };

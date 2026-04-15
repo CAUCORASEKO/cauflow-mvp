@@ -34,6 +34,7 @@ import {
   formatLicenseUsage
 } from "@/lib/license-taxonomy";
 import { formatVisualAssetType } from "@/lib/visual-taxonomy";
+import { formatOfferClass } from "@/lib/offer-class";
 
 export function LicenseDetailDrawer({
   licenseId,
@@ -490,7 +491,17 @@ export function LicenseDetailDrawer({
                         Price
                       </p>
                       <p className="mt-2 font-display text-2xl text-white">
-                        {formatCurrency(Number(license.price))}
+                        {license.offerClass === "free_use"
+                          ? "Free"
+                          : formatCurrency(Number(license.price))}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                        Offer class
+                      </p>
+                      <p className="mt-2 text-sm text-white">
+                        {formatOfferClass(license.offerClass)}
                       </p>
                     </div>
                     <div>
@@ -527,8 +538,10 @@ export function LicenseDetailDrawer({
                       </p>
                     </div>
                     <LicenseCommercialFields
+                      offerClass={license.offerClass}
                       type={type}
                       usage={usage}
+                      price={license.offerClass === "free_use" ? "0" : price}
                       onTypeChange={setType}
                       onUsageChange={setUsage}
                     />
@@ -538,10 +551,16 @@ export function LicenseDetailDrawer({
                         type="number"
                         min="0"
                         step="0.01"
-                        value={price}
+                        value={license.offerClass === "free_use" ? "0" : price}
                         onChange={(event) => setPrice(event.target.value)}
                         required
+                        disabled={license.offerClass === "free_use"}
                       />
+                      <p className="text-sm leading-6 text-slate-400">
+                        {license.offerClass === "free_use"
+                          ? "Free-use licenses stay at zero and never unlock premium delivery."
+                          : "Premium licenses keep the paid commercial price."}
+                      </p>
                     </div>
                     <LicensePolicyBuilder
                       enabled={policyEnabled}

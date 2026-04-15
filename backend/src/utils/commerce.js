@@ -1,4 +1,4 @@
-export const PAYMENT_STATUSES = ["pending", "paid", "failed", "refunded", "canceled"];
+export const PAYMENT_STATUSES = ["pending", "paid", "failed", "refunded", "canceled", "free"];
 
 export const PURCHASE_STATUSES = ["pending", "completed", "failed", "canceled", "refunded"];
 
@@ -52,6 +52,7 @@ export const buildPurchaseSelect = (whereClause = "TRUE") => `
       l.type,
       l.price,
       l.usage,
+      l.offer_class,
       l.status,
       l.created_at,
       (
@@ -63,7 +64,15 @@ export const buildPurchaseSelect = (whereClause = "TRUE") => `
             a.description,
             a.image_url,
             a.preview_image_url,
+            a.preview_file_name,
+            a.preview_mime_type,
+            a.preview_file_size,
+            a.preview_width,
+            a.preview_height,
+            a.preview_aspect_ratio,
+            a.preview_resolution_summary,
             a.visual_type,
+            a.offer_class,
             a.status,
             a.created_at,
             a.owner_user_id
@@ -138,6 +147,7 @@ export const buildPurchaseSelect = (whereClause = "TRUE") => `
       a.review_status,
       a.review_note,
       a.visual_type,
+      a.offer_class,
       a.status,
       a.created_at,
       a.owner_user_id
@@ -239,6 +249,7 @@ export const buildGrantSelect = (whereClause = "TRUE") => `
       l.type,
       l.price,
       l.usage,
+      l.offer_class,
       l.status,
       l.created_at,
       (
@@ -250,7 +261,15 @@ export const buildGrantSelect = (whereClause = "TRUE") => `
             a.description,
             a.image_url,
             a.preview_image_url,
+            a.preview_file_name,
+            a.preview_mime_type,
+            a.preview_file_size,
+            a.preview_width,
+            a.preview_height,
+            a.preview_aspect_ratio,
+            a.preview_resolution_summary,
             a.visual_type,
+            a.offer_class,
             a.status,
             a.created_at,
             a.owner_user_id
@@ -307,7 +326,15 @@ export const buildGrantSelect = (whereClause = "TRUE") => `
       a.description,
       a.image_url,
       a.preview_image_url,
+      a.preview_file_name,
+      a.preview_mime_type,
+      a.preview_file_size,
+      a.preview_width,
+      a.preview_height,
+      a.preview_aspect_ratio,
+      a.preview_resolution_summary,
       a.visual_type,
+      a.offer_class,
       a.status,
       a.master_file_url,
       a.master_file_name,
@@ -376,6 +403,7 @@ export const buildCheckoutSessionSelect = (whereClause = "pr.id = $1") => `
       l.type,
       l.price,
       l.usage,
+      l.offer_class,
       l.status,
       l.created_at,
       (
@@ -387,7 +415,15 @@ export const buildCheckoutSessionSelect = (whereClause = "pr.id = $1") => `
             a.description,
             a.image_url,
             a.preview_image_url,
+            a.preview_file_name,
+            a.preview_mime_type,
+            a.preview_file_size,
+            a.preview_width,
+            a.preview_height,
+            a.preview_aspect_ratio,
+            a.preview_resolution_summary,
             a.visual_type,
+            a.offer_class,
             a.status,
             a.created_at,
             a.owner_user_id
@@ -443,7 +479,16 @@ export const buildCheckoutSessionSelect = (whereClause = "pr.id = $1") => `
       a.title,
       a.description,
       a.image_url,
+      a.preview_image_url,
+      a.preview_file_name,
+      a.preview_mime_type,
+      a.preview_file_size,
+      a.preview_width,
+      a.preview_height,
+      a.preview_aspect_ratio,
+      a.preview_resolution_summary,
       a.visual_type,
+      a.offer_class,
       a.status,
       a.created_at,
       a.owner_user_id

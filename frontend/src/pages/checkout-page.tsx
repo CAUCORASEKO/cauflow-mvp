@@ -40,6 +40,11 @@ const paymentCopy: Record<
     tone: "error",
     message: "Payment was refunded.",
     detail: "The purchase remains on record, and any previously active entitlement has been revoked."
+  },
+  free: {
+    tone: "success",
+    message: "Free acquisition recorded.",
+    detail: "This record represents a zero-cost claim, not a premium payment checkout."
   }
 };
 

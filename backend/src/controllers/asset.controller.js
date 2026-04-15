@@ -8,6 +8,7 @@ import {
   buildStoredAssetFilePayload,
   getAssetPublicationState,
   getAssetReviewSubmissionBlockedReasons,
+  normalizeAssetOfferClass,
   normalizeAssetReviewStatus,
   serializeAssetRecord
 } from "../utils/asset-delivery.js";
@@ -180,7 +181,7 @@ const isClientInputError = (message = "") =>
 
 export const uploadAsset = async (req, res) => {
   try {
-    const { title, description, visualType, status } = req.body;
+    const { title, description, visualType, status, offerClass } = req.body;
     const { previewImage, masterFile } = getUploadedFiles(req);
     const normalizedTitle = title?.trim();
 
@@ -202,6 +203,7 @@ export const uploadAsset = async (req, res) => {
 
     const normalizedVisualType = normalizeVisualType(visualType);
     const normalizedStatus = normalizeAssetStatus(status);
+    const normalizedOfferClass = normalizeAssetOfferClass(offerClass);
     const previewPayload = await buildStoredAssetFilePayload(previewImage);
     const masterPayload = masterFile ? await buildStoredAssetFilePayload(masterFile) : null;
     const previewValues = buildPreviewValues(previewPayload);
@@ -218,6 +220,7 @@ export const uploadAsset = async (req, res) => {
       master_height: masterValues.masterHeight,
       master_aspect_ratio: masterValues.masterAspectRatio,
       master_resolution_summary: masterValues.masterResolutionSummary,
+      offer_class: normalizedOfferClass,
       review_status: "draft",
       status: normalizedStatus
     };
@@ -248,13 +251,14 @@ export const uploadAsset = async (req, res) => {
         master_height,
         master_aspect_ratio,
         master_resolution_summary,
+        offer_class,
         visual_type,
         status,
         owner_user_id
       )
       VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-        $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22
+        $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
       )
       RETURNING *
       `,
@@ -278,6 +282,7 @@ export const uploadAsset = async (req, res) => {
         masterValues.masterHeight,
         masterValues.masterAspectRatio,
         masterValues.masterResolutionSummary,
+        normalizedOfferClass,
         normalizedVisualType,
         normalizedStatus,
         req.user.id
@@ -400,7 +405,7 @@ export const getAssetById = async (req, res) => {
 export const updateAsset = async (req, res) => {
   try {
     const assetId = Number(req.params.id);
-    const { title, description, visualType, status } = req.body;
+    const { title, description, visualType, status, offerClass } = req.body;
     const { previewImage, masterFile } = getUploadedFiles(req);
     const normalizedTitle = title?.trim();
 
@@ -428,6 +433,10 @@ export const updateAsset = async (req, res) => {
       existingAsset.visual_type || DEFAULT_VISUAL_TYPE
     );
     const normalizedStatus = normalizeAssetStatus(status, existingAsset.status || "published");
+    const normalizedOfferClass = normalizeAssetOfferClass(
+      offerClass,
+      existingAsset.offer_class || "premium"
+    );
 
     const previewPayload = previewImage ? await buildStoredAssetFilePayload(previewImage) : null;
     const masterPayload = masterFile ? await buildStoredAssetFilePayload(masterFile) : null;
@@ -449,6 +458,7 @@ export const updateAsset = async (req, res) => {
       master_height: nextMasterValues.masterHeight,
       master_aspect_ratio: nextMasterValues.masterAspectRatio,
       master_resolution_summary: nextMasterValues.masterResolutionSummary,
+      offer_class: normalizedOfferClass,
       review_status: existingAsset.review_status,
       status: normalizedStatus
     };
@@ -480,9 +490,10 @@ export const updateAsset = async (req, res) => {
         master_height = $17,
         master_aspect_ratio = $18,
         master_resolution_summary = $19,
-        visual_type = $20,
-        status = $21
-      WHERE id = $22
+        offer_class = $20,
+        visual_type = $21,
+        status = $22
+      WHERE id = $23
       RETURNING *
       `,
       [
@@ -505,6 +516,7 @@ export const updateAsset = async (req, res) => {
         nextMasterValues.masterHeight,
         nextMasterValues.masterAspectRatio,
         nextMasterValues.masterResolutionSummary,
+        normalizedOfferClass,
         normalizedVisualType,
         normalizedStatus,
         assetId
@@ -667,6 +679,13 @@ export const submitAssetForReview = async (req, res) => {
 
     const asset = assetResult.rows[0];
     const reviewStatus = normalizeAssetReviewStatus(asset.review_status, "draft");
+    const offerClass = normalizeAssetOfferClass(asset.offer_class, "premium");
+
+    if (offerClass === "free_use") {
+      return res.status(409).json({
+        message: "Free-use assets do not require premium review."
+      });
+    }
 
     if (reviewStatus === "in_review") {
       return res.status(409).json({

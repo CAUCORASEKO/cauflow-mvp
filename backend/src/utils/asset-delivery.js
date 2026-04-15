@@ -15,6 +15,21 @@ export const ASSET_REVIEW_STATUSES = new Set([
   "approved",
   "rejected"
 ]);
+export const ASSET_OFFER_CLASSES = new Set(["premium", "free_use"]);
+
+export const normalizeAssetOfferClass = (value, fallback = "premium") => {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return fallback;
+  }
+
+  const normalizedValue = value.trim().toLowerCase();
+
+  if (!ASSET_OFFER_CLASSES.has(normalizedValue)) {
+    throw new Error("offerClass must be one of: premium, free_use");
+  }
+
+  return normalizedValue;
+};
 
 const gcd = (left, right) => {
   let a = Math.abs(left);
@@ -309,8 +324,21 @@ export const getAssetReviewSubmissionBlockedReasons = (deliveryReadiness) => {
   return (deliveryReadiness?.notes || []).map((note) => getDeliveryBlockerCopy(note, "submit"));
 };
 
-export const getAssetPublishBlockedReasons = ({ reviewStatus, deliveryReadiness }) => {
+export const getAssetPublishBlockedReasons = ({
+  offerClass,
+  reviewStatus,
+  deliveryReadiness,
+  previewUrl
+}) => {
   const blockedReasons = [];
+
+  if (!previewUrl) {
+    blockedReasons.push("This asset still needs a preview image before it can be published.");
+  }
+
+  if (offerClass === "free_use") {
+    return blockedReasons;
+  }
 
   if (!deliveryReadiness?.isReady) {
     blockedReasons.push(
@@ -329,6 +357,7 @@ export const getAssetPublicationState = (row) => {
   const previewUrl = row.preview_image_url || row.image_url || null;
   const catalogStatus = row.status || row.asset_status || "draft";
   const reviewStatus = normalizeAssetReviewStatus(row.review_status, "draft");
+  const offerClass = normalizeAssetOfferClass(row.offer_class, "premium");
   const masterFile = buildAssetFileSummary({
     url: row.master_file_url,
     fileName: row.master_file_name,
@@ -344,16 +373,22 @@ export const getAssetPublicationState = (row) => {
     masterFile
   });
   const publishBlockedReasons = getAssetPublishBlockedReasons({
+    offerClass,
     reviewStatus,
-    deliveryReadiness
+    deliveryReadiness,
+    previewUrl
   });
+  const buyerVisible = catalogStatus === "published" && publishBlockedReasons.length === 0;
+  const commercialPathLabel = offerClass === "free_use" ? "free_use" : "premium";
 
   return {
+    offerClass,
     reviewStatus,
     deliveryReadiness,
     canPublish: publishBlockedReasons.length === 0,
     publishBlockedReasons,
-    buyerVisible: catalogStatus === "published" && publishBlockedReasons.length === 0
+    buyerVisible,
+    commercialPathLabel
   };
 };
 
@@ -385,6 +420,7 @@ export const serializeAssetRecord = (row) => {
     ...row,
     image_url: previewUrl,
     preview_image_url: previewUrl,
+    offer_class: publicationState.offerClass,
     preview_file: previewFile,
     master_file: masterFile,
     review_status: publicationState.reviewStatus,

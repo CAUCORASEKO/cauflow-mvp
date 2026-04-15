@@ -5,6 +5,7 @@ import {
   validateAndBuildPolicy
 } from "../utils/license-policy.js";
 import { buildLicenseDeleteBlockMessage } from "../utils/delete-constraints.js";
+import { normalizeAssetOfferClass } from "../utils/asset-delivery.js";
 
 const LICENSE_STATUSES = new Set(["draft", "published", "archived"]);
 const LICENSE_SOURCE_TYPES = new Set(["asset", "pack"]);
@@ -52,6 +53,7 @@ const fetchLicenseWithPolicyById = async (db, licenseId) => {
         a.image_url,
         a.preview_image_url,
         a.visual_type,
+        a.offer_class,
         a.status,
         a.created_at,
         a.owner_user_id
@@ -160,7 +162,8 @@ const resolveLicenseSource = async (db, input, user) => {
       sourceType: "asset",
       sourceAssetId: numericAssetId,
       sourcePackId: null,
-      compatibilityAssetId: numericAssetId
+      compatibilityAssetId: numericAssetId,
+      offerClass: normalizeAssetOfferClass(assetResult.rows[0].offer_class, "premium")
     };
   }
 
@@ -188,7 +191,8 @@ const resolveLicenseSource = async (db, input, user) => {
     sourceType: "pack",
     sourceAssetId: null,
     sourcePackId: numericPackId,
-    compatibilityAssetId: null
+    compatibilityAssetId: null,
+    offerClass: "premium"
   };
 };
 
@@ -287,6 +291,15 @@ export const createLicense = async (req, res) => {
 
     const normalizedStatus = normalizeLicenseStatus(status);
     const source = await resolveLicenseSource(client, req.body, req.user);
+    const normalizedOfferClass = source.offerClass || "premium";
+    const normalizedPrice =
+      normalizedOfferClass === "free_use" ? 0 : Number(price);
+
+    if (Number.isNaN(normalizedPrice)) {
+      return res.status(400).json({
+        message: "price must be a valid number"
+      });
+    }
 
     await client.query("BEGIN");
 
@@ -300,10 +313,11 @@ export const createLicense = async (req, res) => {
         type,
         price,
         usage,
+        offer_class,
         status,
         owner_user_id
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *
       `,
       [
@@ -312,8 +326,9 @@ export const createLicense = async (req, res) => {
         source.sourceAssetId,
         source.sourcePackId,
         type,
-        price,
+        normalizedPrice,
         usage,
+        normalizedOfferClass,
         normalizedStatus,
         req.user.id
       ]
@@ -382,6 +397,7 @@ export const getLicenses = async (req, res) => {
                 a.image_url,
                 a.preview_image_url,
                 a.visual_type,
+                a.offer_class,
                 a.status,
                 a.created_at,
                 a.owner_user_id
@@ -424,6 +440,7 @@ export const getLicenses = async (req, res) => {
                 a.image_url,
                 a.preview_image_url,
                 a.visual_type,
+                a.offer_class,
                 a.status,
                 a.created_at,
                 a.owner_user_id
@@ -533,6 +550,18 @@ export const updateLicense = async (req, res) => {
       status,
       existingLicenseResult.rows[0].status || "published"
     );
+    const normalizedOfferClass = normalizeAssetOfferClass(
+      existingLicenseResult.rows[0].offer_class,
+      "premium"
+    );
+    const normalizedPrice =
+      normalizedOfferClass === "free_use" ? 0 : Number(price);
+
+    if (Number.isNaN(normalizedPrice)) {
+      return res.status(400).json({
+        message: "price must be a valid number"
+      });
+    }
 
     await client.query("BEGIN");
 
@@ -546,12 +575,22 @@ export const updateLicense = async (req, res) => {
           type = $1,
           price = $2,
           usage = $3,
-          status = $4
-      WHERE id = $5
-        AND ($6 = 'admin' OR owner_user_id = $7)
+          offer_class = $4,
+          status = $5
+      WHERE id = $6
+        AND ($7 = 'admin' OR owner_user_id = $8)
       RETURNING *
       `,
-      [type, price, usage, normalizedStatus, licenseId, req.user.role, req.user.id]
+      [
+        type,
+        normalizedPrice,
+        usage,
+        normalizedOfferClass,
+        normalizedStatus,
+        licenseId,
+        req.user.role,
+        req.user.id
+      ]
     );
 
     if (result.rows.length === 0) {

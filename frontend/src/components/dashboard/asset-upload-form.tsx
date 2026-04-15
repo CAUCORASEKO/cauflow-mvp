@@ -21,6 +21,10 @@ import {
   getVisualAssetTypeDescription,
   visualAssetTypeOptions
 } from "@/lib/visual-taxonomy";
+import {
+  formatOfferClass,
+  getOfferClassDescription
+} from "@/lib/offer-class";
 import { formatFileSize } from "@/lib/utils";
 import type { Asset } from "@/types/api";
 
@@ -35,6 +39,7 @@ export function AssetUploadForm({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [visualType, setVisualType] = useState<Asset["visualType"]>("photography");
+  const [offerClass, setOfferClass] = useState<Asset["offerClass"]>("premium");
   const [previewImage, setPreviewImage] = useState<File | null>(null);
   const [masterFile, setMasterFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -75,12 +80,14 @@ export function AssetUploadForm({
         title,
         description,
         visualType,
+        offerClass,
         previewImage,
         masterFile
       });
       setTitle("");
       setDescription("");
       setVisualType("photography");
+      setOfferClass("premium");
       setPreviewImage(null);
       setMasterFile(null);
       setFeedback("Asset saved successfully.");
@@ -132,6 +139,15 @@ export function AssetUploadForm({
                 <p className="mt-2 max-w-[260px] text-sm leading-6 text-slate-400">
                   {getVisualAssetTypeDescription(visualType)}
                 </p>
+                <p className="mt-4 text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                  Commercial path
+                </p>
+                <p className="mt-2 text-sm font-medium text-white">
+                  {formatOfferClass(offerClass)}
+                </p>
+                <p className="mt-2 max-w-[260px] text-sm leading-6 text-slate-400">
+                  {getOfferClassDescription(offerClass)}
+                </p>
               </div>
             }
           >
@@ -169,6 +185,21 @@ export function AssetUploadForm({
               </div>
 
               <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-200">Commercial path</label>
+                <Select
+                  value={offerClass}
+                  onChange={(event) => setOfferClass(event.target.value as Asset["offerClass"])}
+                  required
+                >
+                  <option value="premium">Premium license</option>
+                  <option value="free_use">Free-use offer</option>
+                </Select>
+                <p className="text-sm leading-6 text-slate-400">
+                  Premium stays review and delivery gated. Free-use keeps the asset buyer-visible at zero cost without promising master-file delivery.
+                </p>
+              </div>
+
+              <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-200">
                   Licensing description
                 </label>
@@ -189,7 +220,11 @@ export function AssetUploadForm({
             step="02"
             eyebrow="Files"
             title="Files"
-            description="Upload both the public preview and the premium delivery file. Buyers see the preview first, but licensed buyers unlock the master file after purchase."
+            description={
+              offerClass === "free_use"
+                ? "Upload the public preview file buyers can access through the free-use listing. The master file is optional and remains outside the free-use promise."
+                : "Upload both the public preview and the premium delivery file. Buyers see the preview first, but licensed buyers unlock the master file after purchase."
+            }
           >
             <div className="grid gap-4 2xl:grid-cols-2">
             <label className={`${filePickerClassName} border-white/15 bg-white/[0.025]`}>

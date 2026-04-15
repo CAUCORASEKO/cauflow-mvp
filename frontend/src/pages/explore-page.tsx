@@ -21,15 +21,17 @@ import {
   visualAssetTypeOptions
 } from "@/lib/visual-taxonomy";
 import {
+  claimFreePurchase,
   createCheckoutSession,
   fetchExploreFeed,
   getAssetImageUrl,
   type ApiError
 } from "@/services/api";
 import type { Asset, ExploreFeed, License, Pack, VisualAssetType } from "@/types/api";
+import { formatOfferClass, getOfferClassBadgeClassName } from "@/lib/offer-class";
 
 type PurchaseIntent =
-  | { assetId: number; licenseId: number; label: string }
+  | { assetId: number; licenseId: number; label: string; offerClass: License["offerClass"] }
   | { packId: number; licenseId: number; label: string };
 
 const getCreatorLabel = (creator?: {
@@ -70,7 +72,10 @@ function ExploreAssetCard({
     asset.licenseOptions?.[0] ||
     null;
   const imageUrl = getAssetImageUrl(asset.imageUrl || null);
-  const canBuy = Boolean(asset.monetizationReady && selectedLicense);
+  const isFreeUse = selectedLicense?.offerClass === "free_use";
+  const canBuy = Boolean(
+    selectedLicense && (isFreeUse || asset.monetizationReady)
+  );
 
   return (
     <Card className="surface-highlight overflow-hidden border border-white/10 p-0">
@@ -86,9 +91,16 @@ function ExploreAssetCard({
             <p className="mt-3 inline-flex rounded-full border border-white/10 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-300">
               {formatVisualAssetType(asset.visualType)}
             </p>
+            <p
+              className={`mt-3 inline-flex rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getOfferClassBadgeClassName(
+                asset.offerClass
+              )}`}
+            >
+              {formatOfferClass(asset.offerClass)}
+            </p>
           </div>
           <span className="rounded-full border border-white/10 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-300">
-            {asset.monetizationReady ? "Available" : "Unavailable"}
+            {canBuy ? "Available" : "Unavailable"}
           </span>
         </div>
 
@@ -108,7 +120,10 @@ function ExploreAssetCard({
               {!asset.licenseOptions?.length ? <option value="">No license options</option> : null}
               {asset.licenseOptions?.map((license) => (
                 <option key={license.id} value={license.id}>
-                  {formatLicenseType(license.type)} · {formatCurrency(Number(license.price))}
+                  {formatLicenseType(license.type)} ·{" "}
+                  {license.offerClass === "free_use"
+                    ? "Free"
+                    : formatCurrency(Number(license.price))}
                 </option>
               ))}
             </select>
@@ -127,18 +142,32 @@ function ExploreAssetCard({
               </span>
             </div>
             <div className="flex items-center justify-between gap-4">
+              <span className="text-slate-500">Offer</span>
+              <span className="text-white">
+                {selectedLicense ? formatOfferClass(selectedLicense.offerClass) : "Unavailable"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-4">
               <span className="text-slate-500">Price</span>
               <span className="font-semibold text-white">
-                {selectedLicense ? formatCurrency(Number(selectedLicense.price)) : "Unavailable"}
+                {selectedLicense
+                  ? selectedLicense.offerClass === "free_use"
+                    ? "Free"
+                    : formatCurrency(Number(selectedLicense.price))
+                  : "Unavailable"}
               </span>
             </div>
           </div>
         </div>
 
-        {!asset.monetizationReady && asset.purchaseBlockedReason ? (
+        {!canBuy && asset.purchaseBlockedReason ? (
           <ActionFeedback
             tone="error"
-            message="Checkout is unavailable for this asset right now."
+            message={
+              isFreeUse
+                ? "Free claim is unavailable for this asset right now."
+                : "Checkout is unavailable for this asset right now."
+            }
             detail={asset.purchaseBlockedReason}
           />
         ) : null}
@@ -146,7 +175,9 @@ function ExploreAssetCard({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="flex items-center gap-2 text-sm text-slate-400">
             <ShieldCheck className="h-4 w-4 text-sky-200" />
-            Active rights are granted after payment succeeds.
+            {isFreeUse
+              ? "Free use grants basic asset access. No premium delivery is included."
+              : "Active rights are granted after payment succeeds."}
           </p>
           {user ? (
             <Button
@@ -156,12 +187,19 @@ function ExploreAssetCard({
                   ? onCheckout({
                       assetId: asset.id,
                       licenseId: selectedLicense.id,
-                      label: asset.title
+                      label: asset.title,
+                      offerClass: selectedLicense.offerClass
                     })
                   : undefined
               }
             >
-              {pending ? "Starting checkout..." : "License this asset"}
+              {pending
+                ? isFreeUse
+                  ? "Claiming..."
+                  : "Starting checkout..."
+                : isFreeUse
+                  ? "Claim free asset"
+                  : "License this asset"}
             </Button>
           ) : (
             <Link to="/signup">
@@ -309,22 +347,36 @@ export function ExplorePage() {
     try {
       setPendingLabel(intent.label);
       setFeedback(null);
-      const session = await createCheckoutSession(
-        "assetId" in intent
-          ? { assetId: intent.assetId, licenseId: intent.licenseId }
-          : { packId: intent.packId, licenseId: intent.licenseId }
-      );
+      if ("assetId" in intent && intent.offerClass === "free_use") {
+        await claimFreePurchase({ licenseId: intent.licenseId });
+        setFeedback({
+          tone: "success",
+          message: "Free asset claimed.",
+          detail:
+            "The zero-cost acquisition record is active now. Open Active licenses or Downloads to access the free-use asset."
+        });
+        navigate("/app/buyer/licenses");
+      } else {
+        const session = await createCheckoutSession(
+          "assetId" in intent
+            ? { assetId: intent.assetId, licenseId: intent.licenseId }
+            : { packId: intent.packId, licenseId: intent.licenseId }
+        );
 
-      setFeedback({
-        tone: "success",
-        message: "Checkout session created.",
-        detail: "Review the summary, then complete or cancel the payment state from the checkout screen."
-      });
-      navigate(session.checkoutUrl || `/app/checkout/${session.id}`);
+        setFeedback({
+          tone: "success",
+          message: "Checkout session created.",
+          detail: "Review the summary, then complete or cancel the payment state from the checkout screen."
+        });
+        navigate(session.checkoutUrl || `/app/checkout/${session.id}`);
+      }
     } catch (error) {
       setFeedback({
         tone: "error",
-        message: "Unable to start checkout.",
+        message:
+          "assetId" in intent && intent.offerClass === "free_use"
+            ? "Unable to claim free asset."
+            : "Unable to start checkout.",
         detail: getPurchaseErrorMessage(error as ApiError)
       });
     } finally {

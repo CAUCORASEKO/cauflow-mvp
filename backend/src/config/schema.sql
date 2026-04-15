@@ -82,6 +82,9 @@ ALTER TABLE assets
 ADD COLUMN IF NOT EXISTS status VARCHAR(50) NOT NULL DEFAULT 'draft';
 
 ALTER TABLE assets
+ADD COLUMN IF NOT EXISTS offer_class VARCHAR(20) NOT NULL DEFAULT 'premium';
+
+ALTER TABLE assets
 ADD COLUMN IF NOT EXISTS review_status VARCHAR(50) NOT NULL DEFAULT 'draft';
 
 ALTER TABLE assets
@@ -160,6 +163,10 @@ SET review_status = CASE
 END
 WHERE review_status IS NULL OR trim(review_status) = '';
 
+UPDATE assets
+SET offer_class = 'premium'
+WHERE offer_class IS NULL OR trim(offer_class) = '';
+
 CREATE TABLE IF NOT EXISTS licenses (
   id SERIAL PRIMARY KEY,
   asset_id INTEGER NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
@@ -177,11 +184,18 @@ ALTER TABLE licenses
 ADD COLUMN IF NOT EXISTS status VARCHAR(50) NOT NULL DEFAULT 'published';
 
 ALTER TABLE licenses
+ADD COLUMN IF NOT EXISTS offer_class VARCHAR(20) NOT NULL DEFAULT 'premium';
+
+ALTER TABLE licenses
 ALTER COLUMN asset_id DROP NOT NULL;
 
 UPDATE licenses
 SET status = 'published'
 WHERE status IS NULL OR trim(status) = '';
+
+UPDATE licenses
+SET offer_class = 'premium'
+WHERE offer_class IS NULL OR trim(offer_class) = '';
 
 CREATE TABLE IF NOT EXISTS license_policies (
   id SERIAL PRIMARY KEY,
@@ -218,6 +232,9 @@ ADD COLUMN IF NOT EXISTS asset_id INTEGER REFERENCES assets(id) ON DELETE SET NU
 
 ALTER TABLE purchases
 ADD COLUMN IF NOT EXISTS payment_status VARCHAR(50) NOT NULL DEFAULT 'paid';
+
+ALTER TABLE purchases
+ADD COLUMN IF NOT EXISTS acquisition_type VARCHAR(30) NOT NULL DEFAULT 'checkout';
 
 CREATE TABLE IF NOT EXISTS packs (
   id SERIAL PRIMARY KEY,

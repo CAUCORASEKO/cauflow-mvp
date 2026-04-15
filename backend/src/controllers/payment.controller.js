@@ -30,6 +30,7 @@ const getCheckoutOffering = async (db, { assetId, packId, licenseId }) => {
         l.type AS license_type,
         l.price AS license_price,
         l.usage AS license_usage,
+        l.offer_class AS license_offer_class,
         l.status AS license_status,
         l.owner_user_id AS license_owner_user_id
       FROM packs p
@@ -87,7 +88,8 @@ const getCheckoutOffering = async (db, { assetId, packId, licenseId }) => {
         sourcePackId: pack.license_source_pack_id,
         type: pack.license_type,
         price: Number(pack.pack_price),
-        usage: pack.license_usage
+        usage: pack.license_usage,
+        offerClass: pack.license_offer_class || "premium"
       }
     };
   }
@@ -120,6 +122,7 @@ const getCheckoutOffering = async (db, { assetId, packId, licenseId }) => {
       l.type AS license_type,
       l.price AS license_price,
       l.usage AS license_usage,
+      l.offer_class AS license_offer_class,
       l.status AS license_status,
       l.owner_user_id AS license_owner_user_id
     FROM licenses l
@@ -165,7 +168,8 @@ const getCheckoutOffering = async (db, { assetId, packId, licenseId }) => {
       sourcePackId: assetLicense.license_source_pack_id,
       type: assetLicense.license_type,
       price: Number(assetLicense.license_price),
-      usage: assetLicense.license_usage
+      usage: assetLicense.license_usage,
+      offerClass: assetLicense.license_offer_class || "premium"
     }
   };
 };
@@ -220,6 +224,12 @@ export const createCheckoutSession = async (req, res) => {
     if (!offering) {
       return res.status(404).json({
         message: "Selected offer could not be found"
+      });
+    }
+
+    if (offering.license.offerClass === "free_use") {
+      return res.status(409).json({
+        message: "Use the free-use claim flow for zero-cost offers."
       });
     }
 

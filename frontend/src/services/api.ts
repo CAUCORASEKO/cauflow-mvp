@@ -114,6 +114,7 @@ export const createAsset = async (input: {
   title: string;
   description: string;
   visualType: Asset["visualType"];
+  offerClass: Asset["offerClass"];
   status?: Asset["status"];
   previewImage?: File | null;
   masterFile?: File | null;
@@ -123,6 +124,7 @@ export const createAsset = async (input: {
   formData.append("title", input.title);
   formData.append("description", input.description);
   formData.append("visualType", input.visualType);
+  formData.append("offerClass", input.offerClass);
   if (input.status) {
     formData.append("status", input.status);
   }
@@ -161,6 +163,7 @@ export const updateAsset = async (
     title: string;
     description: string;
     visualType: Asset["visualType"];
+    offerClass: Asset["offerClass"];
     status: Asset["status"];
     previewImage?: File | null;
     masterFile?: File | null;
@@ -171,6 +174,7 @@ export const updateAsset = async (
   formData.append("title", input.title);
   formData.append("description", input.description);
   formData.append("visualType", input.visualType);
+  formData.append("offerClass", input.offerClass);
   formData.append("status", input.status);
 
   const previewImage = input.previewImage || input.image;
@@ -240,6 +244,7 @@ export const createLicense = async (input: {
   type: string;
   price: number;
   usage: string;
+  offerClass?: License["offerClass"];
   status?: License["status"];
   policy?: LicensePolicyInput | null;
 }) => {
@@ -260,6 +265,7 @@ export const updateLicense = async (
     type: string;
     price: number;
     usage: string;
+    offerClass?: License["offerClass"];
     status: License["status"];
     policy?: LicensePolicyInput | null;
   }
@@ -303,6 +309,18 @@ export const createPurchase = async (input: {
   buyerEmail: string;
 }) => {
   const response = await fetch(`${API_BASE_URL}/purchases`, {
+    method: "POST",
+    headers: getAuthHeaders({
+      "Content-Type": "application/json"
+    }),
+    body: JSON.stringify(input)
+  });
+
+  return handleResponse<Purchase>(response);
+};
+
+export const claimFreePurchase = async (input: { licenseId: number }) => {
+  const response = await fetch(`${API_BASE_URL}/purchases/free-claims`, {
     method: "POST",
     headers: getAuthHeaders({
       "Content-Type": "application/json"

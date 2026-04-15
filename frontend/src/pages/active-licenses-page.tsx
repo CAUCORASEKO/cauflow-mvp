@@ -42,13 +42,13 @@ export function ActiveLicensesPage() {
   }, []);
 
   return (
-    <AppShell title="Active licenses" subtitle="Buyer rights activated by successful payment" navItems={buyerNav}>
+    <AppShell title="Active licenses" subtitle="Buyer rights and free-use access" navItems={buyerNav}>
       <section className="glass-panel rounded-[30px] border border-white/10 p-6 md:p-7">
         <p className="text-xs uppercase tracking-[0.24em] text-sky-200">Entitlements</p>
-        <h1 className="mt-3 font-display text-4xl text-white md:text-5xl">Commercial rights live here after checkout clears.</h1>
+        <h1 className="mt-3 font-display text-4xl text-white md:text-5xl">Acquired access lives here after payment or free claim.</h1>
         <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300">
-          Downloads is now the main place to retrieve premium files. This view keeps the commercial
-          rights and delivery state visible alongside each active entitlement.
+          Downloads is now the main place to retrieve premium files or free-use asset access. This
+          view keeps the commercial state visible alongside each active entitlement.
         </p>
       </section>
 
@@ -83,7 +83,11 @@ export function ActiveLicensesPage() {
 
                 <div className="text-left lg:text-right">
                   <p className="font-display text-3xl text-white">
-                    {grant.payment ? formatCurrency(Number(grant.payment.amount)) : "Recorded"}
+                    {grant.license?.offerClass === "free_use"
+                      ? "Free"
+                      : grant.payment
+                        ? formatCurrency(Number(grant.payment.amount))
+                        : "Recorded"}
                   </p>
                   <p className="mt-2 text-sm text-slate-400">{formatDate(grant.createdAt)}</p>
                 </div>
@@ -100,7 +104,13 @@ export function ActiveLicensesPage() {
                 </div>
                 <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Download access</p>
-                  <p className="mt-2 text-white">{grant.downloadAccess ? "Enabled" : "Disabled"}</p>
+                  <p className="mt-2 text-white">
+                    {grant.license?.offerClass === "free_use"
+                      ? "Basic access"
+                      : grant.downloadAccess
+                        ? "Enabled"
+                        : "Disabled"}
+                  </p>
                 </div>
                 <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Creator</p>
@@ -118,16 +128,32 @@ export function ActiveLicensesPage() {
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div>
                     <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
-                      Premium delivery
+                      {grant.license?.offerClass === "free_use" ? "Free asset access" : "Premium delivery"}
                     </p>
                     <p className="mt-2 text-sm font-medium text-white">
-                      {getPremiumDeliveryLabel(grant)}
+                      {grant.license?.offerClass === "free_use"
+                        ? grant.basicAccess?.available
+                          ? "Free asset access ready"
+                          : "Free asset access unavailable"
+                        : getPremiumDeliveryLabel(grant)}
                     </p>
                     <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-                      {getPremiumDeliverySummary(grant)}
+                      {grant.license?.offerClass === "free_use"
+                        ? grant.basicAccess?.reason || "No premium delivery is included with this free-use acquisition."
+                        : getPremiumDeliverySummary(grant)}
                     </p>
                     <div className="mt-4 flex flex-wrap gap-2">
-                      {getPremiumDeliveryMeta(grant).map((item) => (
+                      {(grant.license?.offerClass === "free_use"
+                        ? [
+                            grant.basicAccess?.mimeType
+                              ? grant.basicAccess.mimeType.replace("image/", "").toUpperCase()
+                              : null,
+                            grant.basicAccess?.resolutionSummary || null,
+                            grant.basicAccess?.aspectRatio ? `Aspect ${grant.basicAccess.aspectRatio}` : null,
+                            grant.basicAccess?.fileSize ? formatFileSize(grant.basicAccess.fileSize) : null
+                          ].filter(Boolean)
+                        : getPremiumDeliveryMeta(grant)
+                      ).map((item) => (
                         <span
                           key={item}
                           className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-300"
@@ -138,7 +164,17 @@ export function ActiveLicensesPage() {
                     </div>
                   </div>
 
-                  {grant.premiumDelivery?.mode === "pack" ? (
+                  {grant.license?.offerClass === "free_use" &&
+                  grant.basicAccess?.available &&
+                  getAssetImageUrl(grant.basicAccess.accessUrl) ? (
+                    <a
+                      href={getAssetImageUrl(grant.basicAccess.accessUrl) || undefined}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <Button variant="secondary">Open Free Asset</Button>
+                    </a>
+                  ) : grant.premiumDelivery?.mode === "pack" ? (
                     <Link to="/app/buyer/downloads">
                       <Button variant="secondary">Open Downloads</Button>
                     </Link>
@@ -222,7 +258,7 @@ export function ActiveLicensesPage() {
           <Card className="surface-highlight p-6">
             <p className="text-lg text-white">No active licenses yet.</p>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
-              Successful payments activate buyer rights here. Failed or canceled checkout sessions stay out of the entitlement list.
+              Paid purchases and free claims activate buyer access here. Failed or canceled checkout sessions stay out of the entitlement list.
             </p>
           </Card>
         )}

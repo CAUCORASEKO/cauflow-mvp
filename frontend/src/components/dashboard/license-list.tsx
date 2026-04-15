@@ -8,6 +8,7 @@ import {
 import { getLicensePolicyBadges, getLicensePolicyInput } from "@/lib/license-policy";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { formatCatalogStatus, getCatalogStatusBadgeClassName } from "@/lib/catalog-lifecycle";
+import { formatOfferClass, getOfferClassBadgeClassName } from "@/lib/offer-class";
 
 export function LicenseList({
   licenses,
@@ -94,6 +95,13 @@ export function LicenseList({
                     #{license.id}
                   </span>
                   <span
+                    className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] ${getOfferClassBadgeClassName(
+                      license.offerClass
+                    )}`}
+                  >
+                    {formatOfferClass(license.offerClass)}
+                  </span>
+                  <span
                     className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] ${getCatalogStatusBadgeClassName(
                       license.status
                     )}`}
@@ -134,7 +142,9 @@ export function LicenseList({
                 </span>
                 <div>
                   <p className="font-display text-xl text-white">
-                    {formatCurrency(Number(license.price))}
+                    {license.offerClass === "free_use"
+                      ? "Free"
+                      : formatCurrency(Number(license.price))}
                   </p>
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                     Added {formatDate(license.createdAt)}

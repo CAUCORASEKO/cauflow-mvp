@@ -9,6 +9,7 @@ export type VisualAssetType =
 export type CatalogStatus = "draft" | "published" | "archived";
 export type AssetDeliveryStatus = "delivery_ready" | "needs_fixes";
 export type AssetReviewStatus = "draft" | "in_review" | "approved" | "rejected";
+export type OfferClass = "premium" | "free_use";
 
 export interface AssetFileRecord {
   url: string | null;
@@ -37,6 +38,7 @@ export interface Asset {
   previewFile?: AssetFileRecord | null;
   masterFile?: AssetFileRecord | null;
   deliveryReadiness?: AssetDeliveryReadiness | null;
+  offerClass: OfferClass;
   reviewStatus: AssetReviewStatus;
   reviewNote?: string | null;
   canPublish?: boolean;
@@ -81,6 +83,7 @@ export interface License {
   type: string;
   price: number;
   usage: string;
+  offerClass: OfferClass;
   status: CatalogStatus;
   createdAt: string;
   ownerUserId?: number | null;
@@ -101,6 +104,7 @@ export interface Purchase {
   buyerEmail: string;
   status: string;
   createdAt: string;
+  acquisitionType?: "checkout" | "free_claim";
   buyerUserId?: number | null;
   creatorUserId?: number | null;
   assetId?: number | null;
@@ -211,7 +215,7 @@ export interface Account {
   updatedAt: string;
 }
 
-export type PaymentStatus = "pending" | "paid" | "failed" | "refunded" | "canceled";
+export type PaymentStatus = "pending" | "paid" | "failed" | "refunded" | "canceled" | "free";
 
 export interface PaymentRecord {
   id: number;
@@ -286,6 +290,17 @@ export interface LicenseGrant {
         aspectRatio: string | null;
       };
     }>;
+  } | null;
+  basicAccess?: {
+    mode: "preview";
+    available: boolean;
+    reason: string | null;
+    accessUrl: string | null;
+    fileName: string | null;
+    mimeType: string | null;
+    fileSize: number | null;
+    resolutionSummary: string | null;
+    aspectRatio: string | null;
   } | null;
 }
 

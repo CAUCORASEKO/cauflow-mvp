@@ -13,6 +13,7 @@ import {
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { fetchAdminCatalog, getAssetImageUrl } from "@/services/api";
 import type { AdminCatalogSnapshot } from "@/types/api";
+import { formatOfferClass, getOfferClassBadgeClassName } from "@/lib/offer-class";
 
 type CatalogView = "assets" | "packs" | "licenses";
 
@@ -118,6 +119,13 @@ export function AdminCatalogPage() {
                             label={formatAssetDeliveryStatus(asset.deliveryReadiness?.status)}
                             tone={asset.deliveryReadiness?.isReady ? "success" : "warning"}
                           />
+                          <span
+                            className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getOfferClassBadgeClassName(
+                              asset.offerClass
+                            )}`}
+                          >
+                            {formatOfferClass(asset.offerClass)}
+                          </span>
                         </div>
                         <h2 className="mt-3 font-display text-2xl text-white">{asset.title}</h2>
                         <p className="mt-2 text-sm text-slate-400">
@@ -221,6 +229,13 @@ export function AdminCatalogPage() {
                         label={formatLicenseSourceType(license.sourceType)}
                         tone="info"
                       />
+                      <span
+                        className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getOfferClassBadgeClassName(
+                          license.offerClass
+                        )}`}
+                      >
+                        {formatOfferClass(license.offerClass)}
+                      </span>
                     </div>
                     <h2 className="mt-3 font-display text-2xl text-white">
                       {formatLicenseType(license.type)}
@@ -243,7 +258,11 @@ export function AdminCatalogPage() {
                   <div className="grid gap-3 sm:grid-cols-4 xl:w-[520px]">
                     <div className="rounded-[22px] border border-white/10 bg-black/20 p-4">
                       <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Price</p>
-                      <p className="mt-2 text-white">{formatCurrency(Number(license.price))}</p>
+                      <p className="mt-2 text-white">
+                        {license.offerClass === "free_use"
+                          ? "Free"
+                          : formatCurrency(Number(license.price))}
+                      </p>
                     </div>
                     <div className="rounded-[22px] border border-white/10 bg-black/20 p-4">
                       <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Purchases</p>

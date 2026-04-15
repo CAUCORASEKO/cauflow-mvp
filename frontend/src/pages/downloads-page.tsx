@@ -127,28 +127,63 @@ const buildAssetEntryFromGrant = (grant: LicenseGrant): AssetDeliveryEntry => ({
   kind: "asset",
   id: `grant:${grant.id}`,
   title: grant.asset?.title || `License #${grant.licenseId}`,
-  sourceLabel: "Single asset purchase",
-  contextLabel: getDeliveryTypeLabel(grant),
+  sourceLabel:
+    grant.license?.offerClass === "free_use" ? "Free-use asset" : "Single asset purchase",
+  contextLabel:
+    grant.license?.offerClass === "free_use" ? "Free asset access" : getDeliveryTypeLabel(grant),
   purchaseId: grant.purchaseId,
   createdAt: grant.createdAt,
-  available: Boolean(grant.premiumDelivery?.available),
-  stateCopy: getPremiumDeliveryStateCopy(grant),
-  fileName: grant.premiumDelivery?.fileName || null,
+  available:
+    grant.license?.offerClass === "free_use"
+      ? Boolean(grant.basicAccess?.available)
+      : Boolean(grant.premiumDelivery?.available),
+  stateCopy:
+    grant.license?.offerClass === "free_use"
+      ? grant.basicAccess?.reason || "No premium delivery included"
+      : getPremiumDeliveryStateCopy(grant),
+  fileName:
+    grant.license?.offerClass === "free_use"
+      ? grant.basicAccess?.fileName || null
+      : grant.premiumDelivery?.fileName || null,
   fileFormat: getFileFormatLabel(
-    grant.premiumDelivery?.mimeType || null,
-    grant.premiumDelivery?.fileName || null
+    grant.license?.offerClass === "free_use"
+      ? grant.basicAccess?.mimeType || null
+      : grant.premiumDelivery?.mimeType || null,
+    grant.license?.offerClass === "free_use"
+      ? grant.basicAccess?.fileName || null
+      : grant.premiumDelivery?.fileName || null
   ),
-  resolutionLabel: grant.premiumDelivery?.resolutionSummary || "Resolution unavailable",
-  fileSizeLabel: formatFileSize(grant.premiumDelivery?.fileSize || null),
-  meta: getFileMeta(grant.premiumDelivery || {}),
+  resolutionLabel:
+    (grant.license?.offerClass === "free_use"
+      ? grant.basicAccess?.resolutionSummary
+      : grant.premiumDelivery?.resolutionSummary) || "Resolution unavailable",
+  fileSizeLabel: formatFileSize(
+    (grant.license?.offerClass === "free_use"
+      ? grant.basicAccess?.fileSize
+      : grant.premiumDelivery?.fileSize) || null
+  ),
+  meta: getFileMeta(
+    grant.license?.offerClass === "free_use" ? grant.basicAccess || {} : grant.premiumDelivery || {}
+  ),
   imageUrl: getAssetImageUrl(grant.asset?.previewImageUrl || grant.asset?.previewFile?.url || null),
-  action: grant.premiumDelivery?.available
-    ? {
-        key: `grant:${grant.id}`,
-        label: "Download master file",
-        onDownload: () => downloadEntitlementMasterFile(grant.id)
-      }
-    : null
+  action:
+    grant.license?.offerClass === "free_use"
+      ? grant.basicAccess?.available && grant.basicAccess.accessUrl
+        ? {
+            key: `grant:${grant.id}`,
+            label: "Open free asset",
+            onDownload: async () => {
+              window.open(getAssetImageUrl(grant.basicAccess?.accessUrl || null) || "", "_blank", "noopener,noreferrer");
+            }
+          }
+        : null
+      : grant.premiumDelivery?.available
+        ? {
+            key: `grant:${grant.id}`,
+            label: "Download master file",
+            onDownload: () => downloadEntitlementMasterFile(grant.id)
+          }
+        : null
 });
 
 const buildPackAssetEntry = (
@@ -496,7 +531,7 @@ export function DownloadsPage() {
   return (
     <AppShell
       title="Downloads"
-      subtitle="Premium delivery management for buyer purchases"
+      subtitle="Premium delivery and free asset access"
       navItems={buyerNav}
     >
       {notice ? <ActionFeedback tone={notice.tone} message={notice.message} /> : null}
@@ -506,7 +541,7 @@ export function DownloadsPage() {
           <div className="max-w-3xl">
             <p className="text-xs uppercase tracking-[0.24em] text-sky-200">Delivery management</p>
             <h1 className="mt-3 font-display text-4xl text-white md:text-5xl">
-              Premium files stay organized after the deal closes.
+              Premium master files and free-use asset access stay organized after acquisition.
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300">
               Manage what is ready now, see which files came from single licenses or purchased
@@ -518,7 +553,7 @@ export function DownloadsPage() {
             <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
               <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Ready now</p>
               <p className="mt-2 font-display text-3xl text-white">{downloadableCount}</p>
-              <p className="mt-2 text-sm text-slate-400">Premium files currently unlocked</p>
+              <p className="mt-2 text-sm text-slate-400">Files currently available</p>
             </div>
             <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
               <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
@@ -573,10 +608,10 @@ export function DownloadsPage() {
             <FolderOpen className="h-5 w-5 text-sky-200" />
             <div>
               <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
-                Single asset downloads
+                Single asset access
               </p>
               <p className="text-sm text-slate-300">
-                Direct premium files unlocked from individual asset purchases.
+                Premium master files and free-use asset access for single-asset acquisitions.
               </p>
             </div>
           </div>
@@ -669,7 +704,7 @@ export function DownloadsPage() {
         <Card className="surface-highlight p-6">
           <p className="text-lg text-white">No delivery records match this view.</p>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
-            Premium downloads appear here after checkout activity creates a buyer delivery record.
+            Premium downloads and free-use asset access appear here after acquisition records are created.
             Locked items stay visible so payment and availability states remain clear.
           </p>
           <div className="mt-5 flex flex-wrap gap-3">

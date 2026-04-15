@@ -17,6 +17,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { formatCatalogStatus } from "@/lib/catalog-lifecycle";
+import { formatOfferClass } from "@/lib/offer-class";
 
 export function LicenseForm({
   assets,
@@ -60,6 +61,12 @@ export function LicenseForm({
     setSourceAssetId("");
   }, [sourceType]);
 
+  const selectedAsset =
+    sourceType === "asset"
+      ? availableAssets.find((asset) => asset.id === Number(sourceAssetId)) || null
+      : null;
+  const selectedOfferClass = selectedAsset?.offerClass || "premium";
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmitting(true);
@@ -72,8 +79,9 @@ export function LicenseForm({
         sourceAssetId: sourceType === "asset" ? Number(sourceAssetId) : null,
         sourcePackId: sourceType === "pack" ? Number(sourcePackId) : null,
         type,
-        price: Number(price),
+        price: selectedOfferClass === "free_use" ? 0 : Number(price),
         usage,
+        offerClass: selectedOfferClass,
         policy: policyEnabled ? policy : undefined
       });
       setSourceType("asset");
@@ -148,7 +156,7 @@ export function LicenseForm({
                   <option value="">Select asset</option>
                   {availableAssets.map((asset) => (
                     <option key={asset.id} value={asset.id}>
-                      {asset.title} · {formatCatalogStatus(asset.status)}
+                      {asset.title} · {formatOfferClass(asset.offerClass)} · {formatCatalogStatus(asset.status)}
                     </option>
                   ))}
                 </Select>
@@ -178,8 +186,10 @@ export function LicenseForm({
             )}
 
             <LicenseCommercialFields
+              offerClass={selectedOfferClass}
               type={type}
               usage={usage}
+              price={selectedOfferClass === "free_use" ? "0" : price}
               onTypeChange={setType}
               onUsageChange={setUsage}
             />
@@ -191,10 +201,16 @@ export function LicenseForm({
                 step="0.01"
                 min="0"
                 placeholder="2500"
-                value={price}
+                value={selectedOfferClass === "free_use" ? "0" : price}
                 onChange={(event) => setPrice(event.target.value)}
                 required
+                disabled={selectedOfferClass === "free_use"}
               />
+              <p className="text-sm leading-6 text-slate-400">
+                {selectedOfferClass === "free_use"
+                  ? "Free-use asset offers are fixed at zero cost and stay outside premium delivery."
+                  : "Premium licenses keep their configured paid price."}
+              </p>
             </div>
           </div>
         </FormSection>
@@ -240,7 +256,11 @@ export function LicenseForm({
 
         <FormActionFooter
           guidance="The license becomes purchasable immediately after creation."
-          nextStep="Once this package exists, record a purchase to extend the commercial trail."
+          nextStep={
+            selectedOfferClass === "free_use"
+              ? "Once this package exists, buyers can claim free access without entering premium checkout."
+              : "Once this package exists, record a purchase to extend the commercial trail."
+          }
         >
           <Button
             type="submit"

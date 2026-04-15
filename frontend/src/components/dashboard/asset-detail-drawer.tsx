@@ -44,6 +44,11 @@ import {
   getCatalogStatusHelperCopy
 } from "@/lib/catalog-lifecycle";
 import {
+  formatOfferClass,
+  getOfferClassBadgeClassName,
+  getOfferClassDescription
+} from "@/lib/offer-class";
+import {
   formatAssetReviewStatus,
   getAssetPublishGateCopy,
   getAssetReviewBadgeClassName,
@@ -61,6 +66,10 @@ const reviewWorkflowStates = [
 const getNextWorkflowAction = (asset: Asset) => {
   if (asset.status === "published" && asset.canPublish) {
     return "Currently live in marketplace";
+  }
+
+  if (asset.offerClass === "free_use") {
+    return asset.canPublish ? "Publish free-use offer" : "Add preview access";
   }
 
   if (!asset.deliveryReadiness?.isReady) {
@@ -86,8 +95,11 @@ const getPublicationDecisionState = (asset: Asset) => {
   if (asset.status === "published" && asset.canPublish) {
     return {
       label: "Publish status",
-      value: "Live",
-      detail: "This asset is live in the marketplace.",
+      value: asset.offerClass === "free_use" ? "Free live" : "Live",
+      detail:
+        asset.offerClass === "free_use"
+          ? "This free-use asset is live in the marketplace."
+          : "This asset is live in the marketplace.",
       toneClassName: "border-emerald-400/20 bg-emerald-400/[0.08] text-emerald-100"
     };
   }
@@ -96,7 +108,10 @@ const getPublicationDecisionState = (asset: Asset) => {
     return {
       label: "Publish eligibility",
       value: "Ready",
-      detail: "This asset is ready for marketplace publication.",
+      detail:
+        asset.offerClass === "free_use"
+          ? "This asset is ready for free-use publication."
+          : "This asset is ready for marketplace publication.",
       toneClassName: "border-sky-300/18 bg-sky-300/[0.08] text-sky-100"
     };
   }
@@ -199,6 +214,7 @@ export function AssetDetailDrawer({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [visualType, setVisualType] = useState<Asset["visualType"]>("photography");
+  const [offerClass, setOfferClass] = useState<Asset["offerClass"]>("premium");
   const [status, setStatus] = useState<Asset["status"]>("published");
   const [reviewNote, setReviewNote] = useState("");
   const [replacementPreviewImage, setReplacementPreviewImage] = useState<File | null>(null);
@@ -253,6 +269,7 @@ export function AssetDetailDrawer({
         setTitle(nextAsset.title);
         setDescription(nextAsset.description || "");
         setVisualType(nextAsset.visualType);
+        setOfferClass(nextAsset.offerClass);
         setStatus(nextAsset.status);
         setReviewNote(nextAsset.reviewNote || "");
       } catch (loadError) {
@@ -338,6 +355,7 @@ export function AssetDetailDrawer({
   const nextWorkflowAction = asset ? getNextWorkflowAction(asset) : "";
   const publicationDecisionState = asset ? getPublicationDecisionState(asset) : null;
   const canSubmitForReview =
+    asset?.offerClass === "premium" &&
     Boolean(asset?.deliveryReadiness?.isReady) &&
     (reviewStatus === "draft" || reviewStatus === "rejected");
   const previewDraftFile = replacementPreviewImage
@@ -382,6 +400,7 @@ export function AssetDetailDrawer({
           setTitle(nextAsset.title);
           setDescription(nextAsset.description || "");
           setVisualType(nextAsset.visualType);
+          setOfferClass(nextAsset.offerClass);
           setStatus(nextAsset.status);
           setReviewNote(nextAsset.reviewNote || "");
         })
@@ -410,6 +429,7 @@ export function AssetDetailDrawer({
         title,
         description,
         visualType,
+        offerClass,
         status,
         previewImage: replacementPreviewImage,
         masterFile: replacementMasterFile
@@ -418,6 +438,7 @@ export function AssetDetailDrawer({
       setTitle(updatedAsset.title);
       setDescription(updatedAsset.description || "");
       setVisualType(updatedAsset.visualType);
+      setOfferClass(updatedAsset.offerClass);
       setStatus(updatedAsset.status);
       setReviewNote(updatedAsset.reviewNote || "");
       setReplacementPreviewImage(null);
@@ -447,12 +468,14 @@ export function AssetDetailDrawer({
         title: asset.title,
         description: asset.description || "",
         visualType: asset.visualType,
+        offerClass: asset.offerClass,
         status: nextStatus
       });
       setAsset(updatedAsset);
       setTitle(updatedAsset.title);
       setDescription(updatedAsset.description || "");
       setVisualType(updatedAsset.visualType);
+      setOfferClass(updatedAsset.offerClass);
       setStatus(updatedAsset.status);
       setReviewNote(updatedAsset.reviewNote || "");
       setSaveFeedback(
@@ -646,6 +669,21 @@ export function AssetDetailDrawer({
                 </div>
                 <div className="rounded-[22px] border border-white/8 bg-white/[0.025] p-4">
                   <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                    Offer class
+                  </p>
+                  <p className="mt-2 text-sm font-medium text-white">
+                    {formatOfferClass(asset.offerClass)}
+                  </p>
+                  <span
+                    className={`mt-3 inline-flex rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getOfferClassBadgeClassName(
+                      asset.offerClass
+                    )}`}
+                  >
+                    {formatOfferClass(asset.offerClass)}
+                  </span>
+                </div>
+                <div className="rounded-[22px] border border-white/8 bg-white/[0.025] p-4">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
                     Review state
                   </p>
                   <p className="mt-2 text-sm font-medium text-white">{reviewHelperCopy}</p>
@@ -659,7 +697,7 @@ export function AssetDetailDrawer({
                 </div>
                 <div className="rounded-[22px] border border-white/8 bg-white/[0.025] p-4">
                   <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
-                    Delivery readiness
+                    Premium readiness
                   </p>
                   <p className="mt-2 text-sm font-medium text-white">
                     {getAssetPrimaryReadinessNote(asset)}
@@ -702,6 +740,7 @@ export function AssetDetailDrawer({
                         setTitle(asset.title);
                         setDescription(asset.description || "");
                         setVisualType(asset.visualType);
+                        setOfferClass(asset.offerClass);
                         setStatus(asset.status);
                         setReplacementPreviewImage(null);
                         setReplacementMasterFile(null);
@@ -745,6 +784,17 @@ export function AssetDetailDrawer({
                       </div>
                       <div className="rounded-[22px] border border-white/8 bg-slate-950/45 p-4">
                         <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                          Commercial path
+                        </p>
+                        <p className="mt-2 text-sm text-white">
+                          {formatOfferClass(asset.offerClass)}
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-slate-400">
+                          {getOfferClassDescription(asset.offerClass)}
+                        </p>
+                      </div>
+                      <div className="rounded-[22px] border border-white/8 bg-slate-950/45 p-4">
+                        <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
                           Created
                         </p>
                         <p className="mt-2 text-sm text-white">{formatDate(asset.createdAt)}</p>
@@ -776,7 +826,23 @@ export function AssetDetailDrawer({
                         <option value="archived">Archived</option>
                       </Select>
                       <p className="text-sm leading-6 text-slate-400">
-                        Only approved, delivery-ready assets are visible to buyers.
+                        {offerClass === "free_use"
+                          ? "Free-use assets can be published with a preview file and do not wait on premium review or master-file readiness."
+                          : "Only approved, delivery-ready premium assets are visible to buyers."}
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-slate-200">Commercial path</label>
+                      <Select
+                        value={offerClass}
+                        onChange={(event) => setOfferClass(event.target.value as Asset["offerClass"])}
+                        required
+                      >
+                        <option value="premium">Premium license</option>
+                        <option value="free_use">Free-use offer</option>
+                      </Select>
+                      <p className="text-sm leading-6 text-slate-400">
+                        Premium keeps review and delivery gates. Free-use remains zero-cost and never promises premium delivery.
                       </p>
                     </div>
                     <div className="space-y-2">
@@ -842,6 +908,7 @@ export function AssetDetailDrawer({
                           setTitle(asset.title);
                           setDescription(asset.description || "");
                           setVisualType(asset.visualType);
+                          setOfferClass(asset.offerClass);
                           setStatus(asset.status);
                           setReplacementPreviewImage(null);
                           setReplacementMasterFile(null);
@@ -863,7 +930,11 @@ export function AssetDetailDrawer({
                 step="02"
                 eyebrow="Files"
                 title="Files"
-                description="Upload both the public preview and the premium delivery file. Buyers see the preview first, but licensed buyers unlock the master file after purchase."
+                description={
+                  asset.offerClass === "free_use"
+                    ? "The preview file represents the free-use asset access. A master file can still be stored internally, but it is not promised to free-use buyers."
+                    : "Upload both the public preview and the premium delivery file. Buyers see the preview first, but licensed buyers unlock the master file after purchase."
+                }
               >
                 <div className="grid gap-4">
                   <AssetFileCard
@@ -876,9 +947,19 @@ export function AssetDetailDrawer({
                   />
                   <AssetFileCard
                     label="Master delivery file"
-                    helper="Unlocked later for licensed buyers as the premium delivery file. Upload the final high-resolution version you want to deliver commercially after successful purchase."
+                    helper={
+                      asset.offerClass === "free_use"
+                        ? "Optional internal reference only. Free-use offers do not unlock premium master delivery."
+                        : "Unlocked later for licensed buyers as the premium delivery file. Upload the final high-resolution version you want to deliver commercially after successful purchase."
+                    }
                     file={isEditing ? masterDraftFile : asset.masterFile}
-                    fallback={isEditing ? "Upload a premium delivery file" : "No master delivery file uploaded"}
+                    fallback={
+                      isEditing
+                        ? asset.offerClass === "free_use"
+                          ? "Upload an optional internal master file"
+                          : "Upload a premium delivery file"
+                        : "No master delivery file uploaded"
+                    }
                     ctaLabel={isEditing ? (replacementMasterFile ? "Replace master" : "Choose master") : undefined}
                     onChange={isEditing ? setReplacementMasterFile : undefined}
                   />
@@ -887,9 +968,13 @@ export function AssetDetailDrawer({
 
               <FormSection
                 step="03"
-                eyebrow="Delivery Readiness"
-                title="Delivery readiness"
-                description={assetDeliveryRulesCopy}
+                eyebrow="Premium Readiness"
+                title="Premium readiness"
+                description={
+                  asset.offerClass === "free_use"
+                    ? "This diagnostic still shows whether the asset could qualify for premium delivery later. Free-use publication does not depend on it."
+                    : assetDeliveryRulesCopy
+                }
               >
                 <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr),minmax(220px,0.9fr)]">
                   <div className="rounded-[22px] border border-white/8 bg-slate-950/45 p-4">
@@ -943,7 +1028,11 @@ export function AssetDetailDrawer({
                 step="04"
                 eyebrow="Review Workflow"
                 title="Review workflow"
-                description="Only delivery-ready assets can move into premium review. Only approved assets can be published."
+                description={
+                  asset.offerClass === "free_use"
+                    ? "Free-use assets skip the premium review queue. Switch back to premium when you want this asset evaluated for reviewed commercial delivery."
+                    : "Only delivery-ready assets can move into premium review. Only approved assets can be published."
+                }
                 aside={
                   <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/8 bg-white/[0.04] text-sky-200">
                     <Stamp className="h-5 w-5" />
@@ -981,7 +1070,13 @@ export function AssetDetailDrawer({
                       <span className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-300">
                         Next action: {nextWorkflowAction}
                       </span>
+                      {asset.offerClass === "free_use" ? (
+                        <span className="rounded-full border border-emerald-300/15 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-emerald-100">
+                          Free-use publication does not require premium review
+                        </span>
+                      ) : null}
                       {!canSubmitForReview &&
+                      asset.offerClass === "premium" &&
                       reviewStatus !== "in_review" &&
                       reviewStatus !== "approved" ? (
                         <span className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-300">
@@ -1001,10 +1096,13 @@ export function AssetDetailDrawer({
                         placeholder="Use this to record approval context or explain rejection clearly."
                       />
                       <p className="mt-2 text-sm leading-6 text-slate-400">
-                        Add a review note before rejecting this asset.
+                        {asset.offerClass === "free_use"
+                          ? "Premium review notes are optional while this asset stays in the free-use path."
+                          : "Add a review note before rejecting this asset."}
                       </p>
                     </div>
 
+                    {asset.offerClass === "premium" ? (
                     <div className="mt-5 flex flex-wrap gap-2">
                       {reviewStatus !== "approved" ? (
                         <Button
@@ -1057,6 +1155,7 @@ export function AssetDetailDrawer({
                         </Button>
                       ) : null}
                     </div>
+                    ) : null}
                   </div>
 
                   <div className="grid gap-3 sm:grid-cols-2">

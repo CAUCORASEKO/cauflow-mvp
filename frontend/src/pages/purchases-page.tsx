@@ -20,9 +20,19 @@ const getPaymentState = (purchase: Purchase) =>
 
 const getDeliveryState = (purchase: Purchase, grant: LicenseGrant | undefined) => {
   if (grant) {
+    if (grant.license?.offerClass === "free_use") {
+      return grant.basicAccess?.available
+        ? "Free asset access ready"
+        : grant.basicAccess?.reason || "No premium delivery included";
+    }
+
     return grant.premiumDelivery?.available
       ? "Available in Downloads"
       : getPremiumDeliveryStateCopy(grant);
+  }
+
+  if (purchase.license?.offerClass === "free_use") {
+    return "Free-use claim recorded";
   }
 
   if (getPaymentState(purchase) !== "paid") {
@@ -99,7 +109,11 @@ export function PurchasesPage() {
 
                 <div className="text-left lg:text-right">
                   <p className="font-display text-3xl text-white">
-                    {purchase.payment ? formatCurrency(Number(purchase.payment.amount)) : "Recorded"}
+                    {purchase.license?.offerClass === "free_use"
+                      ? "Free"
+                      : purchase.payment
+                        ? formatCurrency(Number(purchase.payment.amount))
+                        : "Recorded"}
                   </p>
                   <p className="mt-2 text-sm text-slate-400">{formatDate(purchase.createdAt)}</p>
                 </div>
@@ -127,14 +141,20 @@ export function PurchasesPage() {
                 <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Entitlement</p>
                   <p className="mt-2 text-white">
-                    {getPaymentState(purchase) === "paid" ? "Active license" : "Inactive until paid"}
+                    {purchase.license?.offerClass === "free_use"
+                      ? "Free access active"
+                      : getPaymentState(purchase) === "paid"
+                        ? "Active license"
+                        : "Inactive until paid"}
                   </p>
                 </div>
                 <div className="rounded-[24px] border border-white/10 bg-black/20 p-4 md:col-span-2">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Delivery</p>
                   <p className="mt-2 text-white">{getDeliveryState(purchase, relatedGrant)}</p>
                   <p className="mt-2 text-sm text-slate-400">
-                    {purchase.pack
+                    {purchase.license?.offerClass === "free_use"
+                      ? "Free-use acquisitions expose only the basic asset file. Premium master delivery is not included."
+                      : purchase.pack
                       ? "Downloads organizes included pack assets as separate premium files."
                       : "Downloads is the main surface for premium file retrieval."}
                   </p>
@@ -142,7 +162,7 @@ export function PurchasesPage() {
               </div>
 
               <div className="mt-5 flex flex-wrap gap-3">
-                {purchase.payment ? (
+                {purchase.payment && purchase.license?.offerClass !== "free_use" ? (
                   <Link to={`/app/checkout/${purchase.payment.id}`}>
                     <Button variant="secondary">
                       <CreditCard className="mr-2 h-4 w-4" />
@@ -150,17 +170,24 @@ export function PurchasesPage() {
                     </Button>
                   </Link>
                 ) : null}
-                {purchase.payment?.status === "paid" ? (
+                {(purchase.payment?.status === "paid" || purchase.license?.offerClass === "free_use") ? (
                   <Link to="/app/buyer/licenses">
                     <Button variant="ghost">
                       <ShieldCheck className="mr-2 h-4 w-4" />
-                      View active rights
+                      {purchase.license?.offerClass === "free_use"
+                        ? "View active access"
+                        : "View active rights"}
                     </Button>
                   </Link>
                 ) : null}
-                {getPaymentState(purchase) === "paid" && (purchase.assetId || purchase.packId) ? (
+                {(getPaymentState(purchase) === "paid" || purchase.license?.offerClass === "free_use") &&
+                (purchase.assetId || purchase.packId) ? (
                   <Link to="/app/buyer/downloads">
-                    <Button variant="ghost">Open Downloads</Button>
+                    <Button variant="ghost">
+                      {purchase.license?.offerClass === "free_use"
+                        ? "Open free access"
+                        : "Open Downloads"}
+                    </Button>
                   </Link>
                 ) : null}
               </div>

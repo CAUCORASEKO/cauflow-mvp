@@ -9,13 +9,17 @@ import {
 const CUSTOM_OPTION_VALUE = "__custom__";
 
 export function LicenseCommercialFields({
+  offerClass,
   type,
   usage,
+  price,
   onTypeChange,
   onUsageChange
 }: {
+  offerClass: "premium" | "free_use";
   type: string;
   usage: string;
+  price?: string;
   onTypeChange: (value: string) => void;
   onUsageChange: (value: string) => void;
 }) {
@@ -29,8 +33,12 @@ export function LicenseCommercialFields({
           Commercial framing
         </p>
         <p className="mt-2 text-sm leading-6 text-slate-300">
-          These labels position the offer for buyers and appear throughout
-          checkout, sales history, and active licenses.
+          {offerClass === "free_use"
+            ? "These labels frame the asset as a free-use offer. Buyers will see zero cost and no premium delivery promise."
+            : "These labels position the premium offer for buyers and appear throughout checkout, sales history, and active licenses."}
+        </p>
+        <p className="mt-3 text-[11px] uppercase tracking-[0.18em] text-slate-500">
+          {offerClass === "free_use" ? `Buyer price: ${price || "0"}` : "Premium commercial packaging"}
         </p>
       </div>
 

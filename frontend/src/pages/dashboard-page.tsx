@@ -455,6 +455,7 @@ export function DashboardPage() {
         title: asset.title,
         description: asset.description || "",
         visualType: asset.visualType,
+        offerClass: asset.offerClass,
         status: nextStatus
       });
       handleAssetUpdated(updatedAsset);

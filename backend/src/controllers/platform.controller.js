@@ -20,6 +20,31 @@ const hasPaidActiveDownloadAccess = (grant) =>
   grant.download_access &&
   (grant.purchase?.payment_status === "paid" || grant.payment?.status === "paid");
 
+const getFreeUseBasicAccessState = (grant) => {
+  if (grant.license?.offer_class !== "free_use") {
+    return null;
+  }
+
+  const accessUrl = grant.asset?.preview_image_url || grant.asset?.image_url || null;
+
+  return {
+    mode: "preview",
+    available: Boolean(accessUrl),
+    reason: accessUrl
+      ? "Free asset access is available through the catalog preview file."
+      : "Free asset preview is unavailable right now.",
+    accessUrl,
+    fileName: grant.asset?.preview_file_name || null,
+    mimeType: grant.asset?.preview_mime_type || null,
+    fileSize:
+      grant.asset?.preview_file_size === null || grant.asset?.preview_file_size === undefined
+        ? null
+        : Number(grant.asset.preview_file_size),
+    resolutionSummary: grant.asset?.preview_resolution_summary || null,
+    aspectRatio: grant.asset?.preview_aspect_ratio || null
+  };
+};
+
 const buildPackItemDeliveryState = (grantId, item) => {
   const masterFileName = item.master_file_name || null;
   const masterMimeType = item.master_mime_type || null;
@@ -152,6 +177,21 @@ const buildPackPremiumDeliveryState = (grant, includedAssets = []) => {
 };
 
 const getPremiumDeliveryState = (grant) => {
+  if (grant.license?.offer_class === "free_use") {
+    return {
+      mode: "asset",
+      eligible: false,
+      available: false,
+      reason: "No premium delivery included with this free-use asset.",
+      downloadUrl: null,
+      fileName: null,
+      mimeType: null,
+      fileSize: null,
+      resolutionSummary: null,
+      aspectRatio: null
+    };
+  }
+
   const isAssetGrant = Boolean(grant.asset_id || grant.asset?.id);
   const masterFileName = grant.asset?.master_file_name || null;
   const masterMimeType = grant.asset?.master_mime_type || null;
@@ -260,7 +300,8 @@ const serializeEntitlementRecord = (grant) => {
 
   return {
     ...rest,
-    premium_delivery: getPremiumDeliveryState(grant)
+    premium_delivery: getPremiumDeliveryState(grant),
+    basic_access: getFreeUseBasicAccessState(grant)
   };
 };
 
@@ -465,6 +506,7 @@ export const getExploreFeed = async (req, res) => {
           a.master_aspect_ratio,
           a.master_resolution_summary,
           a.visual_type,
+          a.offer_class,
           a.status,
           a.review_status,
           a.review_note,
@@ -472,9 +514,27 @@ export const getExploreFeed = async (req, res) => {
           a.owner_user_id,
           row_to_json(creator_summary) AS creator,
           COALESCE(creator_settings.payout_onboarding_status, 'not_started') AS monetization_status,
-          COALESCE(creator_settings.payout_onboarding_status, 'not_started') = 'active' AS monetization_ready,
+          CASE
+            WHEN EXISTS (
+              SELECT 1
+              FROM licenses explore_license
+              WHERE COALESCE(explore_license.source_type, 'asset') = 'asset'
+                AND COALESCE(explore_license.source_asset_id, explore_license.asset_id) = a.id
+                AND explore_license.status = 'published'
+                AND COALESCE(explore_license.offer_class, 'premium') = 'free_use'
+            ) THEN true
+            ELSE COALESCE(creator_settings.payout_onboarding_status, 'not_started') = 'active'
+          END AS monetization_ready,
           CASE
             WHEN license_options.items IS NULL THEN 'No license options available yet'
+            WHEN EXISTS (
+              SELECT 1
+              FROM licenses explore_license
+              WHERE COALESCE(explore_license.source_type, 'asset') = 'asset'
+                AND COALESCE(explore_license.source_asset_id, explore_license.asset_id) = a.id
+                AND explore_license.status = 'published'
+                AND COALESCE(explore_license.offer_class, 'premium') = 'free_use'
+            ) THEN NULL
             WHEN COALESCE(creator_settings.payout_onboarding_status, 'not_started') <> 'active'
               THEN 'Creator payout onboarding is not active yet'
             ELSE NULL
@@ -506,6 +566,7 @@ export const getExploreFeed = async (req, res) => {
               'type', l.type,
               'price', l.price,
               'usage', l.usage,
+              'offer_class', COALESCE(l.offer_class, 'premium'),
               'status', l.status,
               'created_at', l.created_at,
               'policy', (
@@ -588,6 +649,7 @@ export const getExploreFeed = async (req, res) => {
             l.type,
             l.price,
             l.usage,
+            l.offer_class,
             l.status,
             l.created_at,
             (
@@ -637,6 +699,7 @@ export const getExploreFeed = async (req, res) => {
           type,
           price,
           usage,
+          COALESCE(offer_class, 'premium') AS offer_class,
           status,
           created_at
         FROM licenses
@@ -728,7 +791,7 @@ export const getRoleDashboard = async (req, res) => {
       const [purchasedLicenses, activeLicenses, expiredLicenses, downloads] = await Promise.all([
         getScalar(
           pool,
-          "SELECT COUNT(*)::int AS value FROM purchases WHERE buyer_user_id = $1 AND payment_status = 'paid'",
+          "SELECT COUNT(*)::int AS value FROM purchases WHERE buyer_user_id = $1 AND payment_status IN ('paid', 'free')",
           [req.user.id]
         ),
         getScalar(
