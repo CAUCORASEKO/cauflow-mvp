@@ -36,7 +36,58 @@ const parseAssetIds = (assetIds) => {
   return [...new Set(normalizedAssetIds)];
 };
 
-const validatePackInput = async (db, input, user) => {
+const validatePackLicense = async (db, { licenseId, assetIds, user, packId = null }) => {
+  let numericLicenseId = null;
+
+  if (licenseId === undefined || licenseId === null || licenseId === "") {
+    return null;
+  }
+
+  numericLicenseId = Number(licenseId);
+
+  if (!Number.isInteger(numericLicenseId) || numericLicenseId <= 0) {
+    throw new Error("licenseId must be a valid license id");
+  }
+
+  const licenseResult = await db.query(
+    `
+    SELECT *
+    FROM licenses
+    WHERE id = $1
+      AND ($2 = 'admin' OR owner_user_id = $3)
+    `,
+    [numericLicenseId, user.role, user.id]
+  );
+
+  if (licenseResult.rows.length === 0) {
+    throw new Error("licenseId must exist");
+  }
+
+  const license = licenseResult.rows[0];
+  const sourceType = license.source_type || "asset";
+  const sourceAssetId = license.source_asset_id || license.asset_id || null;
+  const sourcePackId = license.source_pack_id || null;
+
+  if (sourceType === "pack") {
+    if (!packId) {
+      throw new Error("Create the pack first, then attach a pack-native license");
+    }
+
+    if (sourcePackId !== packId) {
+      throw new Error("licenseId must be a pack-native license for this pack");
+    }
+
+    return numericLicenseId;
+  }
+
+  if (!assetIds.includes(sourceAssetId)) {
+    throw new Error("licenseId must belong to one of the selected assets or to this pack");
+  }
+
+  return numericLicenseId;
+};
+
+const validatePackInput = async (db, input, user, options = {}) => {
   const {
     title,
     description,
@@ -47,6 +98,7 @@ const validatePackInput = async (db, input, user) => {
     licenseId,
     assetIds
   } = input;
+  const { packId = null } = options;
 
   if (!isNonEmptyString(title)) {
     throw new Error("title is required");
@@ -110,29 +162,12 @@ const validatePackInput = async (db, input, user) => {
     throw new Error("coverAssetId must exist");
   }
 
-  let numericLicenseId = null;
-
-  if (licenseId !== undefined && licenseId !== null && licenseId !== "") {
-    numericLicenseId = Number(licenseId);
-
-    if (!Number.isInteger(numericLicenseId) || numericLicenseId <= 0) {
-      throw new Error("licenseId must be a valid license id");
-    }
-
-    const licenseResult = await db.query(
-      `
-      SELECT id
-      FROM licenses
-      WHERE id = $1
-        AND ($2 = 'admin' OR owner_user_id = $3)
-      `,
-      [numericLicenseId, user.role, user.id]
-    );
-
-    if (licenseResult.rows.length === 0) {
-      throw new Error("licenseId must exist");
-    }
-  }
+  const numericLicenseId = await validatePackLicense(db, {
+    licenseId,
+    assetIds: normalizedAssetIds,
+    user,
+    packId
+  });
 
   return {
     title: title.trim(),
@@ -197,11 +232,62 @@ const fetchPackById = async (db, packId) => {
           SELECT
             l.id,
             l.asset_id,
+            l.source_type,
+            l.source_asset_id,
+            l.source_pack_id,
             l.type,
             l.price,
             l.usage,
             l.status,
             l.created_at,
+            (
+              SELECT row_to_json(source_asset_summary)
+              FROM (
+                SELECT
+                  a.id,
+                  a.title,
+                  a.description,
+                  a.image_url,
+                  a.preview_image_url,
+                  a.visual_type,
+                  a.status,
+                  a.created_at,
+                  a.owner_user_id
+                FROM assets a
+                WHERE a.id = COALESCE(l.source_asset_id, l.asset_id)
+              ) AS source_asset_summary
+            ) AS source_asset,
+            (
+              SELECT row_to_json(source_pack_summary)
+              FROM (
+                SELECT
+                  pk.id,
+                  pk.title,
+                  pk.description,
+                  pk.cover_asset_id,
+                  pk.price,
+                  pk.status,
+                  pk.category,
+                  pk.license_id,
+                  pk.created_at,
+                  pk.updated_at,
+                  pk.owner_user_id
+                FROM packs pk
+                WHERE pk.id = l.source_pack_id
+              ) AS source_pack_summary
+            ) AS source_pack,
+            COALESCE(
+              (
+                SELECT a.title
+                FROM assets a
+                WHERE a.id = COALESCE(l.source_asset_id, l.asset_id)
+              ),
+              (
+                SELECT pk.title
+                FROM packs pk
+                WHERE pk.id = l.source_pack_id
+              )
+            ) AS source_title,
             (
               SELECT row_to_json(lp)
               FROM (
@@ -321,7 +407,8 @@ export const createPack = async (req, res) => {
     const statusCode =
       error.message.includes("required") ||
       error.message.includes("must") ||
-      error.message.includes("assetIds")
+      error.message.includes("assetIds") ||
+      error.message.includes("Create the pack first")
         ? 400
         : 500;
 
@@ -366,11 +453,62 @@ export const getPacks = async (req, res) => {
             SELECT
               l.id,
               l.asset_id,
+              l.source_type,
+              l.source_asset_id,
+              l.source_pack_id,
               l.type,
               l.price,
               l.usage,
               l.status,
               l.created_at,
+              (
+                SELECT row_to_json(source_asset_summary)
+                FROM (
+                  SELECT
+                    a2.id,
+                    a2.title,
+                    a2.description,
+                    a2.image_url,
+                    a2.preview_image_url,
+                    a2.visual_type,
+                    a2.status,
+                    a2.created_at,
+                    a2.owner_user_id
+                  FROM assets a2
+                  WHERE a2.id = COALESCE(l.source_asset_id, l.asset_id)
+                ) AS source_asset_summary
+              ) AS source_asset,
+              (
+                SELECT row_to_json(source_pack_summary)
+                FROM (
+                  SELECT
+                    pk.id,
+                    pk.title,
+                    pk.description,
+                    pk.cover_asset_id,
+                    pk.price,
+                    pk.status,
+                    pk.category,
+                    pk.license_id,
+                    pk.created_at,
+                    pk.updated_at,
+                    pk.owner_user_id
+                  FROM packs pk
+                  WHERE pk.id = l.source_pack_id
+                ) AS source_pack_summary
+              ) AS source_pack,
+              COALESCE(
+                (
+                  SELECT a2.title
+                  FROM assets a2
+                  WHERE a2.id = COALESCE(l.source_asset_id, l.asset_id)
+                ),
+                (
+                  SELECT pk.title
+                  FROM packs pk
+                  WHERE pk.id = l.source_pack_id
+                )
+              ) AS source_title,
               (
                 SELECT row_to_json(lp)
                 FROM (
@@ -447,7 +585,9 @@ export const updatePack = async (req, res) => {
 
   try {
     const packId = Number(req.params.id);
-    const validatedPack = await validatePackInput(client, req.body, req.user);
+    const validatedPack = await validatePackInput(client, req.body, req.user, {
+      packId
+    });
 
     await client.query("BEGIN");
     transactionStarted = true;
@@ -506,7 +646,8 @@ export const updatePack = async (req, res) => {
     const statusCode =
       error.message.includes("required") ||
       error.message.includes("must") ||
-      error.message.includes("assetIds")
+      error.message.includes("assetIds") ||
+      error.message.includes("Create the pack first")
         ? 400
         : 500;
 
@@ -540,7 +681,15 @@ export const deletePack = async (req, res) => {
       });
     }
 
-    const [purchaseResult, grantResult] = await Promise.all([
+    const [licenseResult, purchaseResult, grantResult] = await Promise.all([
+      pool.query(
+        `
+        SELECT COUNT(*)::int AS value
+        FROM licenses
+        WHERE source_pack_id = $1
+        `,
+        [packId]
+      ),
       pool.query(
         `
         SELECT COUNT(*)::int AS value
@@ -560,11 +709,16 @@ export const deletePack = async (req, res) => {
     ]);
 
     const dependencyCounts = {
-      purchaseCount: purchaseResult.rows[0]?.value || 0,
-      grantCount: grantResult.rows[0]?.value || 0
+      licenseCount: Number(licenseResult.rows[0]?.value || 0),
+      purchaseCount: Number(purchaseResult.rows[0]?.value || 0),
+      grantCount: Number(grantResult.rows[0]?.value || 0)
     };
 
-    if (dependencyCounts.purchaseCount > 0 || dependencyCounts.grantCount > 0) {
+    if (
+      dependencyCounts.licenseCount > 0 ||
+      dependencyCounts.purchaseCount > 0 ||
+      dependencyCounts.grantCount > 0
+    ) {
       return res.status(409).json({
         message: buildPackDeleteBlockMessage(dependencyCounts),
         code: "PACK_DELETE_BLOCKED"

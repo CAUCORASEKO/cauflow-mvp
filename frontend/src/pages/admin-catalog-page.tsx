@@ -5,7 +5,11 @@ import { Card } from "@/components/ui/card";
 import { adminNav } from "@/lib/platform-nav";
 import { formatAssetDeliveryStatus } from "@/lib/asset-delivery";
 import { formatAssetReviewStatus } from "@/lib/asset-review";
-import { formatLicenseType, formatLicenseUsage } from "@/lib/license-taxonomy";
+import {
+  formatLicenseSourceType,
+  formatLicenseType,
+  formatLicenseUsage
+} from "@/lib/license-taxonomy";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { fetchAdminCatalog, getAssetImageUrl } from "@/services/api";
 import type { AdminCatalogSnapshot } from "@/types/api";
@@ -213,12 +217,19 @@ export function AdminCatalogPage() {
                     <div className="flex flex-wrap gap-2">
                       <AdminStatusPill label={license.status} />
                       <AdminStatusPill label={formatLicenseUsage(license.usage)} tone="info" />
+                      <AdminStatusPill
+                        label={formatLicenseSourceType(license.sourceType)}
+                        tone="info"
+                      />
                     </div>
                     <h2 className="mt-3 font-display text-2xl text-white">
                       {formatLicenseType(license.type)}
                     </h2>
                     <p className="mt-2 text-sm text-slate-400">
-                      {license.asset?.title || `Asset #${license.assetId}`}
+                      {license.sourceTitle ||
+                        (license.sourceType === "pack"
+                          ? license.pack?.title || `Pack #${license.sourcePackId}`
+                          : license.asset?.title || `Asset #${license.sourceAssetId || license.assetId}`)}
                     </p>
                     <p className="mt-2 text-sm leading-6 text-slate-300">
                       Owned by{" "}

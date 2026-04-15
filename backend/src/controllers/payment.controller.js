@@ -24,6 +24,9 @@ const getCheckoutOffering = async (db, { assetId, packId, licenseId }) => {
         p.owner_user_id AS pack_owner_user_id,
         l.id AS license_id,
         l.asset_id AS license_asset_id,
+        l.source_type AS license_source_type,
+        l.source_asset_id AS license_source_asset_id,
+        l.source_pack_id AS license_source_pack_id,
         l.type AS license_type,
         l.price AS license_price,
         l.usage AS license_usage,
@@ -60,16 +63,28 @@ const getCheckoutOffering = async (db, { assetId, packId, licenseId }) => {
       throw new Error("The selected pack license is no longer available");
     }
 
+    if (
+      pack.license_source_type === "pack" &&
+      pack.license_source_pack_id !== Number(packId)
+    ) {
+      throw new Error("The selected pack license is no longer available");
+    }
+
     return {
       type: "pack",
-      assetId: pack.license_asset_id || null,
+      assetId:
+        pack.license_source_type === "asset"
+          ? pack.license_source_asset_id || pack.license_asset_id || null
+          : null,
       packId: pack.pack_id,
       title: pack.pack_title,
       description: pack.pack_description,
       creatorUserId: pack.pack_owner_user_id || pack.license_owner_user_id || null,
       license: {
         id: pack.license_id,
-        assetId: pack.license_asset_id,
+        assetId: pack.license_source_asset_id || pack.license_asset_id,
+        sourceType: pack.license_source_type || "asset",
+        sourcePackId: pack.license_source_pack_id,
         type: pack.license_type,
         price: Number(pack.pack_price),
         usage: pack.license_usage
@@ -99,6 +114,9 @@ const getCheckoutOffering = async (db, { assetId, packId, licenseId }) => {
       a.owner_user_id AS asset_owner_user_id,
       l.id AS license_id,
       l.asset_id AS license_asset_id,
+      l.source_type AS license_source_type,
+      l.source_asset_id AS license_source_asset_id,
+      l.source_pack_id AS license_source_pack_id,
       l.type AS license_type,
       l.price AS license_price,
       l.usage AS license_usage,
@@ -119,7 +137,11 @@ const getCheckoutOffering = async (db, { assetId, packId, licenseId }) => {
 
   const assetLicense = result.rows[0];
 
-  if (assetId && assetLicense.asset_id !== Number(assetId)) {
+  if (
+    assetId &&
+    Number(assetLicense.license_source_asset_id || assetLicense.license_asset_id || assetLicense.asset_id) !==
+      Number(assetId)
+  ) {
     throw new Error("The selected license does not belong to this asset");
   }
 
@@ -138,7 +160,9 @@ const getCheckoutOffering = async (db, { assetId, packId, licenseId }) => {
     creatorUserId: assetLicense.license_owner_user_id || assetLicense.asset_owner_user_id || null,
     license: {
       id: assetLicense.license_id,
-      assetId: assetLicense.license_asset_id,
+      assetId: assetLicense.license_source_asset_id || assetLicense.license_asset_id,
+      sourceType: assetLicense.license_source_type || "asset",
+      sourcePackId: assetLicense.license_source_pack_id,
       type: assetLicense.license_type,
       price: Number(assetLicense.license_price),
       usage: assetLicense.license_usage

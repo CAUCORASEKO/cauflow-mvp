@@ -71,7 +71,13 @@ export interface LicensePolicy {
 
 export interface License {
   id: number;
-  assetId: number;
+  assetId: number | null;
+  sourceType: "asset" | "pack";
+  sourceAssetId: number | null;
+  sourcePackId: number | null;
+  sourceTitle?: string | null;
+  sourceAsset?: Asset | null;
+  sourcePack?: Pack | null;
   type: string;
   price: number;
   usage: string;
@@ -83,6 +89,7 @@ export interface License {
 
 export interface AdminLicenseRecord extends License {
   asset?: Asset | null;
+  pack?: Pack | null;
   creator?: AccountSummary | null;
   purchaseCount: number;
   activeGrantCount: number;

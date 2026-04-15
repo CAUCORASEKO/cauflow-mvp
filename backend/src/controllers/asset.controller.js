@@ -578,7 +578,7 @@ export const deleteAsset = async (req, res) => {
           `
           SELECT COUNT(*)::int AS value
           FROM licenses
-          WHERE asset_id = $1
+          WHERE COALESCE(source_asset_id, asset_id) = $1
           `,
           [assetId]
         ),
@@ -601,11 +601,11 @@ export const deleteAsset = async (req, res) => {
       ]);
 
     const dependencyCounts = {
-      packCoverCount: packCoverResult.rows[0]?.value || 0,
-      packInclusionCount: packInclusionResult.rows[0]?.value || 0,
-      licenseCount: licenseResult.rows[0]?.value || 0,
-      purchaseCount: purchaseResult.rows[0]?.value || 0,
-      grantCount: grantResult.rows[0]?.value || 0
+      packCoverCount: Number(packCoverResult.rows[0]?.value || 0),
+      packInclusionCount: Number(packInclusionResult.rows[0]?.value || 0),
+      licenseCount: Number(licenseResult.rows[0]?.value || 0),
+      purchaseCount: Number(purchaseResult.rows[0]?.value || 0),
+      grantCount: Number(grantResult.rows[0]?.value || 0)
     };
 
     if (Object.values(dependencyCounts).some((count) => count > 0)) {

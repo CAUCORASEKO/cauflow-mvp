@@ -15,7 +15,7 @@ import {
 } from "@/lib/license-policy";
 import { fetchLicenseById, updateLicense } from "@/services/api";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import type { Asset, License, Purchase } from "@/types/api";
+import type { Asset, License, Pack, Purchase } from "@/types/api";
 import { ActionFeedback } from "@/components/dashboard/action-feedback";
 import { LicenseCommercialFields } from "@/components/dashboard/license-commercial-fields";
 import { LicensePolicyBuilder } from "@/components/dashboard/license-policy-builder";
@@ -28,12 +28,17 @@ import {
   getCatalogStatusBadgeClassName,
   getCatalogStatusHelperCopy
 } from "@/lib/catalog-lifecycle";
-import { formatLicenseType, formatLicenseUsage } from "@/lib/license-taxonomy";
+import {
+  formatLicenseSourceType,
+  formatLicenseType,
+  formatLicenseUsage
+} from "@/lib/license-taxonomy";
 import { formatVisualAssetType } from "@/lib/visual-taxonomy";
 
 export function LicenseDetailDrawer({
   licenseId,
   assets,
+  packs,
   purchases,
   isDeleting,
   onClose,
@@ -42,6 +47,7 @@ export function LicenseDetailDrawer({
 }: {
   licenseId: number | null;
   assets: Asset[];
+  packs: Pack[];
   purchases: Purchase[];
   isDeleting?: boolean;
   onClose: () => void;
@@ -139,10 +145,31 @@ export function LicenseDetailDrawer({
     return () => window.clearTimeout(timeout);
   }, [saveError, saveFeedback]);
 
-  const linkedAsset = useMemo(
-    () => (license ? assets.find((asset) => asset.id === license.assetId) || null : null),
-    [assets, license]
-  );
+  const linkedAsset = useMemo(() => {
+    if (!license || license.sourceType !== "asset") {
+      return null;
+    }
+
+    return (
+      license.sourceAsset ||
+      assets.find((asset) => asset.id === (license.sourceAssetId || license.assetId)) ||
+      null
+    );
+  }, [assets, license]);
+
+  const linkedPack = useMemo(() => {
+    if (!license || license.sourceType !== "pack") {
+      return null;
+    }
+
+    return license.sourcePack || packs.find((pack) => pack.id === license.sourcePackId) || null;
+  }, [license, packs]);
+
+  const sourceTitle =
+    license?.sourceTitle ||
+    (license?.sourceType === "pack"
+      ? linkedPack?.title || `Pack #${license?.sourcePackId}`
+      : linkedAsset?.title || `Asset #${license?.sourceAssetId || license?.assetId}`);
 
   const relatedPurchases = useMemo(
     () => (license ? purchases.filter((purchase) => purchase.licenseId === license.id) : []),
@@ -313,7 +340,11 @@ export function LicenseDetailDrawer({
                     Visual category
                   </p>
                   <p className="mt-2 text-sm font-medium text-white">
-                    {linkedAsset ? formatVisualAssetType(linkedAsset.visualType) : "Photography"}
+                    {linkedAsset
+                      ? formatVisualAssetType(linkedAsset.visualType)
+                      : linkedPack?.coverAsset?.visualType
+                        ? formatVisualAssetType(linkedPack.coverAsset.visualType)
+                        : "Pack"}
                   </p>
                 </div>
                 <div className="rounded-[22px] border border-white/8 bg-white/[0.025] p-4">
@@ -464,17 +495,17 @@ export function LicenseDetailDrawer({
                     </div>
                     <div>
                       <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
-                        Linked asset
+                        Source type
                       </p>
                       <p className="mt-2 text-sm text-white">
-                        {linkedAsset ? linkedAsset.title : `Asset #${license.assetId}`}
+                        {formatLicenseSourceType(license.sourceType)}
                       </p>
                     </div>
                     <div>
                       <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
-                        Linked asset ID
+                        Source record
                       </p>
-                      <p className="mt-2 text-sm text-white">#{license.assetId}</p>
+                      <p className="mt-2 text-sm text-white">{sourceTitle}</p>
                     </div>
                   </div>
                 ) : (
@@ -623,7 +654,7 @@ export function LicenseDetailDrawer({
                   <p className="text-sm leading-6 text-slate-300">
                     This rights package belongs to{" "}
                     <span className="font-medium text-white">
-                      {linkedAsset ? linkedAsset.title : `Asset #${license.assetId}`}
+                      {sourceTitle}
                     </span>{" "}
                     and currently has{" "}
                     <span className="font-medium text-white">

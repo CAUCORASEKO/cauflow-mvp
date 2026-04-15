@@ -128,11 +128,63 @@ const fetchAdminPacks = async () => {
       SELECT
         l.id,
         l.asset_id,
+        l.source_type,
+        l.source_asset_id,
+        l.source_pack_id,
         l.type,
         l.price,
         l.usage,
         l.status,
         l.created_at,
+        (
+          SELECT row_to_json(source_asset_summary)
+          FROM (
+            SELECT
+              a.id,
+              a.title,
+              a.description,
+              a.image_url,
+              a.preview_image_url,
+              a.visual_type,
+              a.status,
+              a.review_status,
+              a.created_at,
+              a.owner_user_id
+            FROM assets a
+            WHERE a.id = COALESCE(l.source_asset_id, l.asset_id)
+          ) AS source_asset_summary
+        ) AS source_asset,
+        (
+          SELECT row_to_json(source_pack_summary)
+          FROM (
+            SELECT
+              pk.id,
+              pk.title,
+              pk.description,
+              pk.cover_asset_id,
+              pk.price,
+              pk.status,
+              pk.category,
+              pk.license_id,
+              pk.created_at,
+              pk.updated_at,
+              pk.owner_user_id
+            FROM packs pk
+            WHERE pk.id = l.source_pack_id
+          ) AS source_pack_summary
+        ) AS source_pack,
+        COALESCE(
+          (
+            SELECT a.title
+            FROM assets a
+            WHERE a.id = COALESCE(l.source_asset_id, l.asset_id)
+          ),
+          (
+            SELECT pk.title
+            FROM packs pk
+            WHERE pk.id = l.source_pack_id
+          )
+        ) AS source_title,
         (
           SELECT row_to_json(lp)
           FROM (
@@ -161,6 +213,8 @@ const fetchAdminLicenses = async () => {
       l.*,
       ${normalizeTextColumn("l.status", "published")} AS normalized_status,
       row_to_json(asset_summary) AS asset,
+      row_to_json(pack_summary) AS pack,
+      COALESCE(asset_summary.title, pack_summary.title) AS source_title,
       row_to_json(creator_summary) AS creator,
       (
         SELECT COUNT(*)::int
@@ -195,8 +249,24 @@ const fetchAdminLicenses = async () => {
         a.created_at,
         a.owner_user_id
       FROM assets a
-      WHERE a.id = l.asset_id
+      WHERE a.id = COALESCE(l.source_asset_id, l.asset_id)
     ) AS asset_summary ON true
+    LEFT JOIN LATERAL (
+      SELECT
+        pk.id,
+        pk.title,
+        pk.description,
+        pk.cover_asset_id,
+        pk.price,
+        pk.status,
+        pk.category,
+        pk.license_id,
+        pk.created_at,
+        pk.updated_at,
+        pk.owner_user_id
+      FROM packs pk
+      WHERE pk.id = l.source_pack_id
+    ) AS pack_summary ON true
     LEFT JOIN LATERAL (
       SELECT
         u.id,

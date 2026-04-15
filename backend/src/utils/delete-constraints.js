@@ -51,8 +51,12 @@ export const buildAssetDeleteBlockMessage = ({
   )}. Remove the dependency before deleting.`;
 };
 
-export const buildPackDeleteBlockMessage = ({ purchaseCount, grantCount }) => {
+export const buildPackDeleteBlockMessage = ({ purchaseCount, grantCount, licenseCount }) => {
   const segments = [];
+
+  if (licenseCount > 0) {
+    segments.push(formatDependencySegment(licenseCount, "pack-linked license"));
+  }
 
   if (purchaseCount > 0) {
     segments.push(formatDependencySegment(purchaseCount, "purchase record"));

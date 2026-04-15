@@ -46,3 +46,6 @@ export const formatLicenseType = (value: string) =>
 
 export const formatLicenseUsage = (value: string) =>
   formatTaxonomyValue(value, LICENSE_USAGE_OPTIONS);
+
+export const formatLicenseSourceType = (value: "asset" | "pack") =>
+  value === "pack" ? "Pack" : "Asset";

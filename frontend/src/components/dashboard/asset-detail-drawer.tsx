@@ -304,7 +304,14 @@ export function AssetDetailDrawer({
   );
 
   const relatedLicenses = useMemo(
-    () => (asset ? licenses.filter((license) => license.assetId === asset.id) : []),
+    () =>
+      asset
+        ? licenses.filter(
+            (license) =>
+              license.sourceType === "asset" &&
+              (license.sourceAssetId || license.assetId) === asset.id
+          )
+        : [],
     [asset, licenses]
   );
 

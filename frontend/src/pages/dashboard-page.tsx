@@ -356,13 +356,19 @@ export function DashboardPage() {
 
   const handleLicenseCreated = useCallback((license: License) => {
     setLicenses((currentLicenses) => [license, ...currentLicenses]);
-    setSelectedAssetId(license.assetId);
+    setSelectedAssetId(
+      license.sourceType === "asset" ? license.sourceAssetId || license.assetId : null
+    );
+    setSelectedPackId(license.sourceType === "pack" ? license.sourcePackId : null);
     setSelectedLicenseId(license.id);
     setLastSyncedAt(new Date());
     setWorkspaceNotice({
       tone: "success",
       message: "License package created",
-      detail: "The linked asset detail now reflects the new rights package."
+      detail:
+        license.sourceType === "pack"
+          ? "The selected pack can now carry its own native rights package."
+          : "The linked asset detail now reflects the new rights package."
     });
   }, []);
 
@@ -600,7 +606,9 @@ export function DashboardPage() {
     }
 
     const linkedLicenseCount = licenses.filter(
-      (license) => license.assetId === assetPendingDelete.id
+      (license) =>
+        license.sourceType === "asset" &&
+        (license.sourceAssetId || license.assetId) === assetPendingDelete.id
     ).length;
     const packCoverCount = packs.filter(
       (pack) => pack.coverAssetId === assetPendingDelete.id
@@ -919,7 +927,7 @@ export function DashboardPage() {
           <SectionHeading
             eyebrow="Packs"
             title="Creative asset packs"
-            copy="Group assets into premium commercial bundles with a defined cover, pricing, category, and optional base license."
+                copy="Group assets into premium commercial bundles with a defined cover, pricing, category, and an optional attached rights package."
           />
 
           <div className="mt-8 space-y-6">
@@ -976,7 +984,7 @@ export function DashboardPage() {
       <section id="licenses" className="scroll-mt-6">
         <div className="grid gap-5 xl:grid-cols-[minmax(320px,0.82fr),minmax(0,1.18fr)] 2xl:grid-cols-[390px,minmax(0,1fr)]">
           <div className="xl:sticky xl:top-4 xl:self-start">
-            <LicenseForm assets={assets} onCreated={handleLicenseCreated} />
+            <LicenseForm assets={assets} packs={packs} onCreated={handleLicenseCreated} />
           </div>
 
           <div className="space-y-6">
@@ -1001,6 +1009,7 @@ export function DashboardPage() {
                     <LicenseList
                       licenses={filteredLicenses}
                       assets={assets}
+                      packs={packs}
                       purchases={purchases}
                       selectedLicenseId={selectedLicenseId}
                       statusActionLicenseId={licenseStatusActionId}
@@ -1068,6 +1077,7 @@ export function DashboardPage() {
       <LicenseDetailDrawer
         licenseId={selectedLicenseId}
         assets={assets}
+        packs={packs}
         purchases={purchases}
         isDeleting={isDeletingLicense}
         onClose={() => setSelectedLicenseId(null)}

@@ -66,13 +66,23 @@ export function AssetsGrid({
   const purchaseCountByAssetId = new Map<number, number>();
 
   for (const license of licenses) {
+    const sourceAssetId = license.sourceAssetId || license.assetId;
+
+    if (license.sourceType !== "asset" || !sourceAssetId) {
+      continue;
+    }
+
     licenseCountByAssetId.set(
-      license.assetId,
-      (licenseCountByAssetId.get(license.assetId) || 0) + 1
+      sourceAssetId,
+      (licenseCountByAssetId.get(sourceAssetId) || 0) + 1
     );
   }
 
-  const assetIdByLicenseId = new Map(licenses.map((license) => [license.id, license.assetId]));
+  const assetIdByLicenseId = new Map(
+    licenses
+      .filter((license) => license.sourceType === "asset")
+      .map((license) => [license.id, license.sourceAssetId || license.assetId])
+  );
 
   for (const purchase of purchases) {
     const assetId = assetIdByLicenseId.get(purchase.licenseId);

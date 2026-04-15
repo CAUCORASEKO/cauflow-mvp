@@ -39,7 +39,11 @@ export function PurchaseList({
       <div className="space-y-3">
         {purchases.map((purchase) => {
           const license = licenseMap.get(purchase.licenseId);
-          const asset = license ? assetMap.get(license.assetId) : null;
+          const asset =
+            purchase.asset ||
+            (license && license.sourceType === "asset"
+              ? assetMap.get(license.sourceAssetId || license.assetId || -1)
+              : null);
           const isSelected = selectedPurchaseId === purchase.id;
 
           return (
@@ -59,7 +63,11 @@ export function PurchaseList({
                     License #{purchase.licenseId} {license ? `· ${formatLicenseType(license.type)}` : ""}
                   </p>
                   <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">
-                    {asset ? `${asset.title} · Asset #${asset.id}` : "Asset unavailable"}
+                    {purchase.pack
+                      ? `${purchase.pack.title} · Pack #${purchase.pack.id}`
+                      : asset
+                        ? `${asset.title} · Asset #${asset.id}`
+                        : "Source unavailable"}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3 text-left md:justify-end md:text-right">

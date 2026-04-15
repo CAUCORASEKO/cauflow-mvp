@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { LoaderCircle, ShieldCheck } from "lucide-react";
-import type { Asset, License } from "@/types/api";
+import type { Asset, License, Pack } from "@/types/api";
 import {
   DEFAULT_LICENSE_POLICY,
   type LicensePolicyInput
@@ -20,13 +20,18 @@ import { formatCatalogStatus } from "@/lib/catalog-lifecycle";
 
 export function LicenseForm({
   assets,
+  packs,
   onCreated
 }: {
   assets: Asset[];
+  packs: Pack[];
   onCreated: (license: License) => void | Promise<void>;
 }) {
   const availableAssets = assets.filter((asset) => asset.status !== "archived");
-  const [assetId, setAssetId] = useState("");
+  const availablePacks = packs.filter((pack) => pack.status !== "archived");
+  const [sourceType, setSourceType] = useState<License["sourceType"]>("asset");
+  const [sourceAssetId, setSourceAssetId] = useState("");
+  const [sourcePackId, setSourcePackId] = useState("");
   const [type, setType] = useState("Standard");
   const [price, setPrice] = useState("");
   const [usage, setUsage] = useState("Web");
@@ -46,6 +51,15 @@ export function LicenseForm({
     return () => window.clearTimeout(timeout);
   }, [feedback]);
 
+  useEffect(() => {
+    if (sourceType === "asset") {
+      setSourcePackId("");
+      return;
+    }
+
+    setSourceAssetId("");
+  }, [sourceType]);
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmitting(true);
@@ -54,13 +68,17 @@ export function LicenseForm({
 
     try {
       const createdLicense = await createLicense({
-        assetId: Number(assetId),
+        sourceType,
+        sourceAssetId: sourceType === "asset" ? Number(sourceAssetId) : null,
+        sourcePackId: sourceType === "pack" ? Number(sourcePackId) : null,
         type,
         price: Number(price),
         usage,
         policy: policyEnabled ? policy : undefined
       });
-      setAssetId("");
+      setSourceType("asset");
+      setSourceAssetId("");
+      setSourcePackId("");
       setType("Standard");
       setPrice("");
       setUsage("Web");
@@ -99,29 +117,65 @@ export function LicenseForm({
       <form className="space-y-5" onSubmit={handleSubmit}>
         <FormSection
           step="01"
-          eyebrow="Source asset"
-          title="Anchor the license to an inventory record"
-          description="Choose the asset, then define the commercial package buyers will recognize and purchase."
+          eyebrow="Source record"
+          title="Anchor the license to a commercial source record"
+          description="Choose whether this rights package belongs to an individual asset or to a full pack, then define the buyer-facing commercial terms."
         >
           <div className="mt-4 space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-100">Source asset</label>
+              <label className="text-sm font-medium text-slate-100">Source type</label>
               <Select
-                value={assetId}
-                onChange={(event) => setAssetId(event.target.value)}
+                value={sourceType}
+                onChange={(event) => setSourceType(event.target.value as License["sourceType"])}
                 required
               >
-                <option value="">Select an asset</option>
-                {availableAssets.map((asset) => (
-                  <option key={asset.id} value={asset.id}>
-                    {asset.title} · {formatCatalogStatus(asset.status)}
-                  </option>
-                ))}
+                <option value="asset">Asset</option>
+                <option value="pack">Pack</option>
               </Select>
               <p className="text-sm leading-6 text-slate-400">
-                Archived assets are preserved for history, but kept out of new rights packaging.
+                Use asset for a single inventory item, or pack when the rights package belongs to the full bundled product.
               </p>
             </div>
+
+            {sourceType === "asset" ? (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-100">Select asset</label>
+                <Select
+                  value={sourceAssetId}
+                  onChange={(event) => setSourceAssetId(event.target.value)}
+                  required
+                >
+                  <option value="">Select asset</option>
+                  {availableAssets.map((asset) => (
+                    <option key={asset.id} value={asset.id}>
+                      {asset.title} · {formatCatalogStatus(asset.status)}
+                    </option>
+                  ))}
+                </Select>
+                <p className="text-sm leading-6 text-slate-400">
+                  Archived assets are preserved for history, but kept out of new rights packaging.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-100">Select pack</label>
+                <Select
+                  value={sourcePackId}
+                  onChange={(event) => setSourcePackId(event.target.value)}
+                  required
+                >
+                  <option value="">Select pack</option>
+                  {availablePacks.map((pack) => (
+                    <option key={pack.id} value={pack.id}>
+                      {pack.title} · {formatCatalogStatus(pack.status)}
+                    </option>
+                  ))}
+                </Select>
+                <p className="text-sm leading-6 text-slate-400">
+                  Pack-native licenses let the bundle carry its own rights package instead of relying only on an asset-derived baseline.
+                </p>
+              </div>
+            )}
 
             <LicenseCommercialFields
               type={type}
@@ -191,7 +245,10 @@ export function LicenseForm({
           <Button
             type="submit"
             variant="primary"
-            disabled={submitting || availableAssets.length === 0}
+            disabled={
+              submitting ||
+              (sourceType === "asset" ? availableAssets.length === 0 : availablePacks.length === 0)
+            }
             className="min-w-[168px] gap-2"
             aria-busy={submitting}
           >

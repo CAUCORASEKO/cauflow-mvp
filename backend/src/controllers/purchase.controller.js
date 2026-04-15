@@ -32,10 +32,16 @@ export const createPurchase = async (req, res) => {
         a.master_width,
         a.master_height,
         a.master_aspect_ratio,
-        a.master_resolution_summary
+        a.master_resolution_summary,
+        p.id AS pack_id,
+        p.title AS pack_title,
+        p.status AS pack_status,
+        p.owner_user_id AS pack_owner_user_id
       FROM licenses l
-      JOIN assets a
-        ON a.id = l.asset_id
+      LEFT JOIN assets a
+        ON a.id = COALESCE(l.source_asset_id, l.asset_id)
+      LEFT JOIN packs p
+        ON p.id = l.source_pack_id
       WHERE l.id = $1
       `,
       [numericLicenseId]
@@ -48,12 +54,19 @@ export const createPurchase = async (req, res) => {
     }
 
     const license = licenseResult.rows[0];
+    const sourceType = license.source_type || "asset";
 
-    const publicationState = getAssetPublicationState(license);
+    if (sourceType === "asset") {
+      const publicationState = getAssetPublicationState(license);
 
-    if (license.status !== "published" || !publicationState.buyerVisible) {
+      if (license.status !== "published" || !publicationState.buyerVisible) {
+        return res.status(409).json({
+          message: "This visual asset is no longer available for new purchases"
+        });
+      }
+    } else if (license.status !== "published" || license.pack_status !== "published") {
       return res.status(409).json({
-        message: "This visual asset is no longer available for new purchases"
+        message: "This pack is no longer available for new purchases"
       });
     }
 
@@ -66,9 +79,10 @@ export const createPurchase = async (req, res) => {
         buyer_user_id,
         creator_user_id,
         asset_id,
+        pack_id,
         payment_status
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING id
       `,
       [
@@ -76,8 +90,11 @@ export const createPurchase = async (req, res) => {
         buyerEmail || req.user.email,
         "completed",
         req.user.id,
-        license.owner_user_id || license.asset_owner_user_id || null,
-        license.asset_id,
+        license.owner_user_id ||
+          (sourceType === "pack" ? license.pack_owner_user_id : license.asset_owner_user_id) ||
+          null,
+        sourceType === "asset" ? license.source_asset_id || license.asset_id : null,
+        sourceType === "pack" ? license.pack_id : null,
         "paid"
       ]
     );

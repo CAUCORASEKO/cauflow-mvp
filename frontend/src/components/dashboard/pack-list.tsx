@@ -90,20 +90,23 @@ export function PackList({
                   <span>
                     {pack.license
                       ? `${formatLicenseType(pack.license.type)} license`
-                      : "No base license"}
+                      : "No attached license"}
                   </span>
                   <span>Updated {formatDate(pack.updatedAt)}</span>
                 </div>
               </button>
 
-              <div className="flex flex-col items-start gap-2 md:items-end">
+              <div className="flex flex-col items-start gap-2.5 md:items-end">
+                <span className="px-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                  Pack actions
+                </span>
                 <button
                   type="button"
                   className="focus-ring inline-flex items-center gap-2 rounded-full border border-sky-300/20 bg-sky-300/[0.12] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-50 transition hover:bg-sky-300/[0.16]"
                   onClick={() => onSelectPack(pack)}
                 >
                   <Eye className="h-3.5 w-3.5" />
-                  Detail
+                  Pack detail
                 </button>
                 <button
                   type="button"
@@ -111,7 +114,7 @@ export function PackList({
                   onClick={() => onSelectPack(pack)}
                 >
                   <PencilLine className="h-3.5 w-3.5" />
-                  Edit
+                  Edit pack
                 </button>
                 <button
                   type="button"
@@ -119,7 +122,7 @@ export function PackList({
                   onClick={() => onDeletePack(pack)}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                  Delete
+                  Delete pack
                 </button>
               </div>
             </div>

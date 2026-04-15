@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { formatLicenseType } from "@/lib/license-taxonomy";
+import { formatLicenseSourceType, formatLicenseType } from "@/lib/license-taxonomy";
 import { getAssetImageUrl, getPackById, updatePack } from "@/services/api";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Asset, License, Pack, PackCategory, PackStatus } from "@/types/api";
@@ -156,8 +156,15 @@ export function PackDetailDrawer({
     [assets]
   );
   const availableLicenses = useMemo(
-    () => licenses.filter((license) => license.status !== "archived"),
-    [licenses]
+    () =>
+      licenses.filter(
+        (license) =>
+          license.status !== "archived" &&
+          (license.sourceType === "pack"
+            ? license.sourcePackId === pack?.id
+            : selectedAssetIds.includes(license.sourceAssetId || license.assetId || -1))
+      ),
+    [licenses, pack?.id, selectedAssetIds]
   );
 
   const coverAsset =
@@ -417,7 +424,7 @@ export function PackDetailDrawer({
                   value={formatCurrency(Number(pack.price))}
                 />
                 <MetricCard
-                  label="Base license"
+                  label="Attached rights"
                   value={pack.license ? formatLicenseType(pack.license.type) : "None"}
                 />
                 <MetricCard
@@ -588,18 +595,21 @@ export function PackDetailDrawer({
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-200">Base license</label>
+                        <label className="text-sm font-medium text-slate-200">Attached rights package</label>
                         <Select
                           value={licenseId}
                           onChange={(event) => setLicenseId(event.target.value)}
                         >
-                          <option value="">No base license</option>
+                          <option value="">No attached license</option>
                           {availableLicenses.map((license) => (
                             <option key={license.id} value={license.id}>
-                              {formatLicenseType(license.type)} · #{license.id} · {formatCatalogStatus(license.status)}
+                              {formatLicenseSourceType(license.sourceType)} · {formatLicenseType(license.type)} · #{license.id}
                             </option>
                           ))}
                         </Select>
+                        <p className="text-sm leading-6 text-slate-400">
+                          Attach either a pack-native license for this pack or a legacy asset-derived license from one of the included assets.
+                        </p>
                       </div>
                     </div>
                   </section>

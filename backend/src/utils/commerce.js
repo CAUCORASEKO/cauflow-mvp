@@ -46,11 +46,62 @@ export const buildPurchaseSelect = (whereClause = "TRUE") => `
     SELECT
       l.id,
       l.asset_id,
+      l.source_type,
+      l.source_asset_id,
+      l.source_pack_id,
       l.type,
       l.price,
       l.usage,
       l.status,
       l.created_at,
+      (
+        SELECT row_to_json(source_asset_summary)
+        FROM (
+          SELECT
+            a.id,
+            a.title,
+            a.description,
+            a.image_url,
+            a.preview_image_url,
+            a.visual_type,
+            a.status,
+            a.created_at,
+            a.owner_user_id
+          FROM assets a
+          WHERE a.id = COALESCE(l.source_asset_id, l.asset_id)
+        ) AS source_asset_summary
+      ) AS source_asset,
+      (
+        SELECT row_to_json(source_pack_summary)
+        FROM (
+          SELECT
+            pk.id,
+            pk.title,
+            pk.description,
+            pk.cover_asset_id,
+            pk.price,
+            pk.status,
+            pk.category,
+            pk.license_id,
+            pk.created_at,
+            pk.updated_at,
+            pk.owner_user_id
+          FROM packs pk
+          WHERE pk.id = l.source_pack_id
+        ) AS source_pack_summary
+      ) AS source_pack,
+      COALESCE(
+        (
+          SELECT a.title
+          FROM assets a
+          WHERE a.id = COALESCE(l.source_asset_id, l.asset_id)
+        ),
+        (
+          SELECT pk.title
+          FROM packs pk
+          WHERE pk.id = l.source_pack_id
+        )
+      ) AS source_title,
       (
         SELECT row_to_json(lp)
         FROM (
@@ -182,11 +233,62 @@ export const buildGrantSelect = (whereClause = "TRUE") => `
     SELECT
       l.id,
       l.asset_id,
+      l.source_type,
+      l.source_asset_id,
+      l.source_pack_id,
       l.type,
       l.price,
       l.usage,
       l.status,
       l.created_at,
+      (
+        SELECT row_to_json(source_asset_summary)
+        FROM (
+          SELECT
+            a.id,
+            a.title,
+            a.description,
+            a.image_url,
+            a.preview_image_url,
+            a.visual_type,
+            a.status,
+            a.created_at,
+            a.owner_user_id
+          FROM assets a
+          WHERE a.id = COALESCE(l.source_asset_id, l.asset_id)
+        ) AS source_asset_summary
+      ) AS source_asset,
+      (
+        SELECT row_to_json(source_pack_summary)
+        FROM (
+          SELECT
+            pk.id,
+            pk.title,
+            pk.description,
+            pk.cover_asset_id,
+            pk.price,
+            pk.status,
+            pk.category,
+            pk.license_id,
+            pk.created_at,
+            pk.updated_at,
+            pk.owner_user_id
+          FROM packs pk
+          WHERE pk.id = l.source_pack_id
+        ) AS source_pack_summary
+      ) AS source_pack,
+      COALESCE(
+        (
+          SELECT a.title
+          FROM assets a
+          WHERE a.id = COALESCE(l.source_asset_id, l.asset_id)
+        ),
+        (
+          SELECT pk.title
+          FROM packs pk
+          WHERE pk.id = l.source_pack_id
+        )
+      ) AS source_title,
       (
         SELECT row_to_json(lp)
         FROM (
@@ -268,11 +370,62 @@ export const buildCheckoutSessionSelect = (whereClause = "pr.id = $1") => `
     SELECT
       l.id,
       l.asset_id,
+      l.source_type,
+      l.source_asset_id,
+      l.source_pack_id,
       l.type,
       l.price,
       l.usage,
       l.status,
       l.created_at,
+      (
+        SELECT row_to_json(source_asset_summary)
+        FROM (
+          SELECT
+            a.id,
+            a.title,
+            a.description,
+            a.image_url,
+            a.preview_image_url,
+            a.visual_type,
+            a.status,
+            a.created_at,
+            a.owner_user_id
+          FROM assets a
+          WHERE a.id = COALESCE(l.source_asset_id, l.asset_id)
+        ) AS source_asset_summary
+      ) AS source_asset,
+      (
+        SELECT row_to_json(source_pack_summary)
+        FROM (
+          SELECT
+            pk.id,
+            pk.title,
+            pk.description,
+            pk.cover_asset_id,
+            pk.price,
+            pk.status,
+            pk.category,
+            pk.license_id,
+            pk.created_at,
+            pk.updated_at,
+            pk.owner_user_id
+          FROM packs pk
+          WHERE pk.id = l.source_pack_id
+        ) AS source_pack_summary
+      ) AS source_pack,
+      COALESCE(
+        (
+          SELECT a.title
+          FROM assets a
+          WHERE a.id = COALESCE(l.source_asset_id, l.asset_id)
+        ),
+        (
+          SELECT pk.title
+          FROM packs pk
+          WHERE pk.id = l.source_pack_id
+        )
+      ) AS source_title,
       (
         SELECT row_to_json(lp)
         FROM (

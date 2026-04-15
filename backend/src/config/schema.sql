@@ -176,6 +176,9 @@ ADD COLUMN IF NOT EXISTS owner_user_id INTEGER REFERENCES users(id) ON DELETE SE
 ALTER TABLE licenses
 ADD COLUMN IF NOT EXISTS status VARCHAR(50) NOT NULL DEFAULT 'published';
 
+ALTER TABLE licenses
+ALTER COLUMN asset_id DROP NOT NULL;
+
 UPDATE licenses
 SET status = 'published'
 WHERE status IS NULL OR trim(status) = '';
@@ -249,6 +252,74 @@ CREATE TABLE IF NOT EXISTS pack_assets (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(pack_id, asset_id)
 );
+
+ALTER TABLE licenses
+ADD COLUMN IF NOT EXISTS source_type VARCHAR(20);
+
+ALTER TABLE licenses
+ADD COLUMN IF NOT EXISTS source_asset_id INTEGER REFERENCES assets(id) ON DELETE CASCADE;
+
+ALTER TABLE licenses
+ADD COLUMN IF NOT EXISTS source_pack_id INTEGER REFERENCES packs(id) ON DELETE CASCADE;
+
+UPDATE licenses
+SET source_type = CASE
+  WHEN source_pack_id IS NOT NULL THEN 'pack'
+  ELSE 'asset'
+END
+WHERE source_type IS NULL OR trim(source_type) = '';
+
+UPDATE licenses
+SET source_asset_id = asset_id
+WHERE source_asset_id IS NULL AND asset_id IS NOT NULL;
+
+UPDATE licenses
+SET asset_id = source_asset_id
+WHERE source_type = 'asset'
+  AND source_asset_id IS NOT NULL
+  AND asset_id IS DISTINCT FROM source_asset_id;
+
+UPDATE licenses
+SET asset_id = NULL
+WHERE source_type = 'pack'
+  AND asset_id IS NOT NULL;
+
+DO $$
+BEGIN
+  ALTER TABLE licenses
+  ADD CONSTRAINT licenses_source_type_check
+  CHECK (source_type IN ('asset', 'pack'));
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  ALTER TABLE licenses
+  ADD CONSTRAINT licenses_exact_source_target_check
+  CHECK (
+    (
+      CASE WHEN source_asset_id IS NOT NULL THEN 1 ELSE 0 END
+      +
+      CASE WHEN source_pack_id IS NOT NULL THEN 1 ELSE 0 END
+    ) = 1
+  );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  ALTER TABLE licenses
+  ADD CONSTRAINT licenses_source_type_target_match_check
+  CHECK (
+    (source_type = 'asset' AND source_asset_id IS NOT NULL AND source_pack_id IS NULL)
+    OR
+    (source_type = 'pack' AND source_pack_id IS NOT NULL AND source_asset_id IS NULL)
+  );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE TABLE IF NOT EXISTS payment_records (
   id SERIAL PRIMARY KEY,

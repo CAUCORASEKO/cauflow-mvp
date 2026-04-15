@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { formatLicenseType } from "@/lib/license-taxonomy";
+import { formatLicenseSourceType, formatLicenseType } from "@/lib/license-taxonomy";
 import { formatCurrency } from "@/lib/utils";
 import { createPack } from "@/services/api";
 import type { Asset, License, Pack, PackCategory, PackStatus } from "@/types/api";
@@ -65,8 +65,15 @@ export function PackForm({
     [assets]
   );
   const availableLicenses = useMemo(
-    () => licenses.filter((license) => license.status !== "archived"),
-    [licenses]
+    () =>
+      licenses.filter(
+        (license) =>
+          license.status !== "archived" &&
+          (license.sourceType === "pack"
+            ? false
+            : selectedAssetIds.includes(license.sourceAssetId || license.assetId || -1))
+      ),
+    [licenses, selectedAssetIds]
   );
 
   const selectedCoverAsset =
@@ -175,7 +182,7 @@ export function PackForm({
           <h3 className="mt-2 font-display text-2xl text-white">Create pack</h3>
           <p className="mt-2 text-sm leading-6 text-slate-300">
             Group multiple assets into a premium commercial unit with pricing, cover
-            art, and an optional base license.
+            art, and an optional attached rights package.
           </p>
         </div>
       </div>
@@ -254,15 +261,18 @@ export function PackForm({
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-100">Base license</label>
+              <label className="text-sm font-medium text-slate-100">Attached rights package</label>
               <Select value={licenseId} onChange={(event) => setLicenseId(event.target.value)}>
-                <option value="">No base license</option>
+                <option value="">No attached license</option>
                 {availableLicenses.map((license) => (
                   <option key={license.id} value={license.id}>
-                    {formatLicenseType(license.type)} · #{license.id} · {formatCatalogStatus(license.status)}
+                    {formatLicenseSourceType(license.sourceType)} · {formatLicenseType(license.type)} · #{license.id}
                   </option>
                 ))}
               </Select>
+              <p className="text-sm leading-6 text-slate-400">
+                During initial pack creation you can attach a compatible asset-based license from the selected contents. After the pack exists, create a pack-native license and attach it from the pack detail drawer.
+              </p>
             </div>
           </div>
         </FormSection>
@@ -313,7 +323,7 @@ export function PackForm({
             </div>
             <div className="rounded-[22px] border border-white/8 bg-black/20 p-4">
               <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300/80">
-                Base license
+                Attached rights
               </p>
               <p className="mt-2 text-sm font-semibold text-white">
                 {selectedLicense ? selectedLicense.type : "Not attached"}

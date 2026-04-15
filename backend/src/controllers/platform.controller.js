@@ -500,6 +500,9 @@ export const getExploreFeed = async (req, res) => {
             json_build_object(
               'id', l.id,
               'asset_id', l.asset_id,
+              'source_type', COALESCE(l.source_type, 'asset'),
+              'source_asset_id', COALESCE(l.source_asset_id, l.asset_id),
+              'source_pack_id', l.source_pack_id,
               'type', l.type,
               'price', l.price,
               'usage', l.usage,
@@ -517,7 +520,8 @@ export const getExploreFeed = async (req, res) => {
             ORDER BY l.price ASC, l.id ASC
           ) AS items
           FROM licenses l
-          WHERE l.asset_id = a.id
+          WHERE COALESCE(l.source_type, 'asset') = 'asset'
+            AND COALESCE(l.source_asset_id, l.asset_id) = a.id
             AND l.status = 'published'
         ) AS license_options ON true
         WHERE a.status = 'published'
@@ -550,6 +554,9 @@ export const getExploreFeed = async (req, res) => {
           COALESCE(cs.payout_onboarding_status, 'not_started') = 'active' AS monetization_ready,
           CASE
             WHEN p.license_id IS NULL THEN 'No pack license is attached yet'
+            WHEN COALESCE(base_license.source_type, 'asset') = 'pack'
+              AND base_license.source_pack_id IS DISTINCT FROM p.id
+              THEN 'The attached pack license no longer matches this pack'
             WHEN COALESCE(cs.payout_onboarding_status, 'not_started') <> 'active'
               THEN 'Creator payout onboarding is not active yet'
             ELSE NULL
@@ -575,6 +582,9 @@ export const getExploreFeed = async (req, res) => {
           SELECT
             l.id,
             l.asset_id,
+            l.source_type,
+            l.source_asset_id,
+            l.source_pack_id,
             l.type,
             l.price,
             l.usage,
@@ -607,13 +617,28 @@ export const getExploreFeed = async (req, res) => {
         WHERE p.status = 'published'
           AND cover_asset.id IS NOT NULL
           AND base_license.id IS NOT NULL
+          AND (
+            COALESCE(base_license.source_type, 'asset') = 'pack'
+            AND base_license.source_pack_id = p.id
+            OR COALESCE(base_license.source_type, 'asset') = 'asset'
+          )
         ORDER BY p.updated_at DESC
         LIMIT 12
         `
       ),
       pool.query(
         `
-        SELECT id, asset_id, type, price, usage, status, created_at
+        SELECT
+          id,
+          asset_id,
+          COALESCE(source_type, 'asset') AS source_type,
+          COALESCE(source_asset_id, asset_id) AS source_asset_id,
+          source_pack_id,
+          type,
+          price,
+          usage,
+          status,
+          created_at
         FROM licenses
         WHERE status = 'published'
         ORDER BY created_at DESC

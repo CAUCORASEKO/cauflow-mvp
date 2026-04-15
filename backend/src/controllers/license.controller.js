@@ -7,6 +7,7 @@ import {
 import { buildLicenseDeleteBlockMessage } from "../utils/delete-constraints.js";
 
 const LICENSE_STATUSES = new Set(["draft", "published", "archived"]);
+const LICENSE_SOURCE_TYPES = new Set(["asset", "pack"]);
 
 const normalizeLicenseStatus = (value, fallback = "published") => {
   if (typeof value !== "string" || value.trim().length === 0) {
@@ -37,8 +38,43 @@ const fetchPolicyByLicenseId = async (db, licenseId) => {
 const fetchLicenseWithPolicyById = async (db, licenseId) => {
   const licenseResult = await db.query(
     `
-    SELECT * FROM licenses
-    WHERE id = $1
+    SELECT
+      l.*,
+      row_to_json(source_asset_summary) AS source_asset,
+      row_to_json(source_pack_summary) AS source_pack,
+      COALESCE(source_asset_summary.title, source_pack_summary.title) AS source_title
+    FROM licenses l
+    LEFT JOIN LATERAL (
+      SELECT
+        a.id,
+        a.title,
+        a.description,
+        a.image_url,
+        a.preview_image_url,
+        a.visual_type,
+        a.status,
+        a.created_at,
+        a.owner_user_id
+      FROM assets a
+      WHERE a.id = COALESCE(l.source_asset_id, l.asset_id)
+    ) AS source_asset_summary ON true
+    LEFT JOIN LATERAL (
+      SELECT
+        p.id,
+        p.title,
+        p.description,
+        p.cover_asset_id,
+        p.price,
+        p.status,
+        p.category,
+        p.license_id,
+        p.created_at,
+        p.updated_at,
+        p.owner_user_id
+      FROM packs p
+      WHERE p.id = l.source_pack_id
+    ) AS source_pack_summary ON true
+    WHERE l.id = $1
     `,
     [licenseId]
   );
@@ -78,6 +114,82 @@ const attachPoliciesToLicenses = async (db, licenses) => {
     ...license,
     policy: policyByLicenseId.get(license.id) || null
   }));
+};
+
+const normalizeLicenseSourceType = (value, fallback = "asset") => {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return fallback;
+  }
+
+  const normalizedValue = value.trim().toLowerCase();
+
+  if (!LICENSE_SOURCE_TYPES.has(normalizedValue)) {
+    throw new Error("sourceType must be one of: asset, pack");
+  }
+
+  return normalizedValue;
+};
+
+const resolveLicenseSource = async (db, input, user) => {
+  const sourceType = normalizeLicenseSourceType(input.sourceType ?? (input.packId ? "pack" : "asset"));
+  const assetIdCandidate = input.sourceAssetId ?? input.assetId;
+  const packIdCandidate = input.sourcePackId ?? input.packId;
+
+  if (sourceType === "asset") {
+    const numericAssetId = Number(assetIdCandidate);
+
+    if (!Number.isInteger(numericAssetId) || numericAssetId <= 0) {
+      throw new Error("sourceAssetId is required");
+    }
+
+    const assetResult = await db.query(
+      `
+      SELECT *
+      FROM assets
+      WHERE id = $1
+        AND ($2 = 'admin' OR owner_user_id = $3)
+      `,
+      [numericAssetId, user.role, user.id]
+    );
+
+    if (assetResult.rows.length === 0) {
+      throw new Error("Asset not found. Cannot create license.");
+    }
+
+    return {
+      sourceType: "asset",
+      sourceAssetId: numericAssetId,
+      sourcePackId: null,
+      compatibilityAssetId: numericAssetId
+    };
+  }
+
+  const numericPackId = Number(packIdCandidate);
+
+  if (!Number.isInteger(numericPackId) || numericPackId <= 0) {
+    throw new Error("sourcePackId is required");
+  }
+
+  const packResult = await db.query(
+    `
+    SELECT *
+    FROM packs
+    WHERE id = $1
+      AND ($2 = 'admin' OR owner_user_id = $3)
+    `,
+    [numericPackId, user.role, user.id]
+  );
+
+  if (packResult.rows.length === 0) {
+    throw new Error("Pack not found. Cannot create license.");
+  }
+
+  return {
+    sourceType: "pack",
+    sourceAssetId: null,
+    sourcePackId: numericPackId,
+    compatibilityAssetId: null
+  };
 };
 
 const upsertLicensePolicy = async (db, licenseId, policyInput) => {
@@ -165,42 +277,46 @@ export const createLicense = async (req, res) => {
   const client = await pool.connect();
 
   try {
-    const { assetId, type, price, usage, policy, status } = req.body;
+    const { type, price, usage, policy, status } = req.body;
 
-    if (!assetId || !type || price === undefined || !usage) {
+    if (!type || price === undefined || !usage) {
       return res.status(400).json({
-        message: "assetId, type, price and usage are required"
-      });
-    }
-
-    const numericAssetId = Number(assetId);
-
-    const assetResult = await client.query(
-      `
-      SELECT * FROM assets
-      WHERE id = $1
-        AND ($2 = 'admin' OR owner_user_id = $3)
-      `,
-      [numericAssetId, req.user.role, req.user.id]
-    );
-
-    if (assetResult.rows.length === 0) {
-      return res.status(404).json({
-        message: "Asset not found. Cannot create license."
+        message: "sourceType, sourceAssetId or sourcePackId, type, price and usage are required"
       });
     }
 
     const normalizedStatus = normalizeLicenseStatus(status);
+    const source = await resolveLicenseSource(client, req.body, req.user);
 
     await client.query("BEGIN");
 
     const result = await client.query(
       `
-      INSERT INTO licenses (asset_id, type, price, usage, status, owner_user_id)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO licenses (
+        asset_id,
+        source_type,
+        source_asset_id,
+        source_pack_id,
+        type,
+        price,
+        usage,
+        status,
+        owner_user_id
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *
       `,
-      [numericAssetId, type, price, usage, normalizedStatus, req.user.id]
+      [
+        source.compatibilityAssetId,
+        source.sourceType,
+        source.sourceAssetId,
+        source.sourcePackId,
+        type,
+        price,
+        usage,
+        normalizedStatus,
+        req.user.id
+      ]
     );
 
     const createdLicense = result.rows[0];
@@ -223,12 +339,22 @@ export const createLicense = async (req, res) => {
     const statusCode =
       error.message === "policy must be a valid object" ||
       error.message.startsWith("policy.") ||
-      error.message.includes("status must be one of")
+      error.message.includes("status must be one of") ||
+      error.message.includes("sourceType must be one of") ||
+      error.message.includes("sourceAssetId is required") ||
+      error.message.includes("sourcePackId is required")
         ? 400
-        : 500;
+        : error.message.includes("not found. Cannot create license.")
+          ? 404
+          : 500;
 
     res.status(statusCode).json({
-      message: statusCode === 400 ? "Invalid license policy" : "Error creating license",
+      message:
+        statusCode === 400
+          ? "Invalid license input"
+          : statusCode === 404
+            ? error.message
+            : "Error creating license",
       error: error.message
     });
   } finally {
@@ -242,16 +368,86 @@ export const getLicenses = async (req, res) => {
       req.user?.role === "creator"
         ? await pool.query(
             `
-            SELECT * FROM licenses
-            WHERE owner_user_id = $1
-            ORDER BY id ASC
+            SELECT
+              l.*,
+              row_to_json(source_asset_summary) AS source_asset,
+              row_to_json(source_pack_summary) AS source_pack,
+              COALESCE(source_asset_summary.title, source_pack_summary.title) AS source_title
+            FROM licenses l
+            LEFT JOIN LATERAL (
+              SELECT
+                a.id,
+                a.title,
+                a.description,
+                a.image_url,
+                a.preview_image_url,
+                a.visual_type,
+                a.status,
+                a.created_at,
+                a.owner_user_id
+              FROM assets a
+              WHERE a.id = COALESCE(l.source_asset_id, l.asset_id)
+            ) AS source_asset_summary ON true
+            LEFT JOIN LATERAL (
+              SELECT
+                p.id,
+                p.title,
+                p.description,
+                p.cover_asset_id,
+                p.price,
+                p.status,
+                p.category,
+                p.license_id,
+                p.created_at,
+                p.updated_at,
+                p.owner_user_id
+              FROM packs p
+              WHERE p.id = l.source_pack_id
+            ) AS source_pack_summary ON true
+            WHERE l.owner_user_id = $1
+            ORDER BY l.id ASC
             `,
             [req.user.id]
           )
         : await pool.query(`
-            SELECT * FROM licenses
-            WHERE status = 'published'
-            ORDER BY id ASC
+            SELECT
+              l.*,
+              row_to_json(source_asset_summary) AS source_asset,
+              row_to_json(source_pack_summary) AS source_pack,
+              COALESCE(source_asset_summary.title, source_pack_summary.title) AS source_title
+            FROM licenses l
+            LEFT JOIN LATERAL (
+              SELECT
+                a.id,
+                a.title,
+                a.description,
+                a.image_url,
+                a.preview_image_url,
+                a.visual_type,
+                a.status,
+                a.created_at,
+                a.owner_user_id
+              FROM assets a
+              WHERE a.id = COALESCE(l.source_asset_id, l.asset_id)
+            ) AS source_asset_summary ON true
+            LEFT JOIN LATERAL (
+              SELECT
+                p.id,
+                p.title,
+                p.description,
+                p.cover_asset_id,
+                p.price,
+                p.status,
+                p.category,
+                p.license_id,
+                p.created_at,
+                p.updated_at,
+                p.owner_user_id
+              FROM packs p
+              WHERE p.id = l.source_pack_id
+            ) AS source_pack_summary ON true
+            WHERE l.status = 'published'
+            ORDER BY l.id ASC
           `);
 
     const licensesWithPolicies = await attachPoliciesToLicenses(pool, result.rows);
@@ -343,7 +539,14 @@ export const updateLicense = async (req, res) => {
     const result = await client.query(
       `
       UPDATE licenses
-      SET type = $1, price = $2, usage = $3, status = $4
+      SET asset_id = CASE
+            WHEN source_type = 'asset' THEN COALESCE(source_asset_id, asset_id)
+            ELSE NULL
+          END,
+          type = $1,
+          price = $2,
+          usage = $3,
+          status = $4
       WHERE id = $5
         AND ($6 = 'admin' OR owner_user_id = $7)
       RETURNING *
@@ -443,9 +646,9 @@ export const deleteLicense = async (req, res) => {
     ]);
 
     const dependencyCounts = {
-      packCount: packResult.rows[0]?.value || 0,
-      purchaseCount: purchaseResult.rows[0]?.value || 0,
-      grantCount: grantResult.rows[0]?.value || 0
+      packCount: Number(packResult.rows[0]?.value || 0),
+      purchaseCount: Number(purchaseResult.rows[0]?.value || 0),
+      grantCount: Number(grantResult.rows[0]?.value || 0)
     };
 
     if (

@@ -1,6 +1,10 @@
 import { Eye, PencilLine, Trash2 } from "lucide-react";
-import type { Asset, License, Purchase } from "@/types/api";
-import { formatLicenseType, formatLicenseUsage } from "@/lib/license-taxonomy";
+import type { Asset, License, Pack, Purchase } from "@/types/api";
+import {
+  formatLicenseSourceType,
+  formatLicenseType,
+  formatLicenseUsage
+} from "@/lib/license-taxonomy";
 import { getLicensePolicyBadges, getLicensePolicyInput } from "@/lib/license-policy";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { formatCatalogStatus, getCatalogStatusBadgeClassName } from "@/lib/catalog-lifecycle";
@@ -8,6 +12,7 @@ import { formatCatalogStatus, getCatalogStatusBadgeClassName } from "@/lib/catal
 export function LicenseList({
   licenses,
   assets,
+  packs,
   purchases,
   selectedLicenseId,
   statusActionLicenseId,
@@ -17,6 +22,7 @@ export function LicenseList({
 }: {
   licenses: License[];
   assets: Asset[];
+  packs: Pack[];
   purchases: Purchase[];
   selectedLicenseId: number | null;
   statusActionLicenseId: number | null;
@@ -25,6 +31,7 @@ export function LicenseList({
   onDeleteLicense: (license: License) => void;
 }) {
   const assetMap = new Map(assets.map((asset) => [asset.id, asset.title]));
+  const packMap = new Map(packs.map((pack) => [pack.id, pack.title]));
   const purchaseCountByLicenseId = new Map<number, number>();
 
   for (const purchase of purchases) {
@@ -40,6 +47,14 @@ export function LicenseList({
         const isSelected = selectedLicenseId === license.id;
         const isUpdatingStatus = statusActionLicenseId === license.id;
         const purchaseCount = purchaseCountByLicenseId.get(license.id) || 0;
+        const sourceTitle =
+          license.sourceTitle ||
+          (license.sourceType === "pack"
+            ? license.sourcePack?.title || packMap.get(license.sourcePackId || -1)
+            : license.sourceAsset?.title || assetMap.get(license.sourceAssetId || -1)) ||
+          `${formatLicenseSourceType(license.sourceType)} #${
+            license.sourceType === "pack" ? license.sourcePackId : license.sourceAssetId
+          }`;
         const policyBadges = license.policy
           ? getLicensePolicyBadges(getLicensePolicyInput(license.policy)).slice(0, 3)
           : [];
@@ -70,8 +85,11 @@ export function LicenseList({
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="font-semibold text-white">
-                    {assetMap.get(license.assetId) || `Asset #${license.assetId}`}
+                    {sourceTitle}
                   </p>
+                  <span className="rounded-full border border-sky-300/15 bg-sky-300/8 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-sky-100">
+                    {formatLicenseSourceType(license.sourceType)}
+                  </span>
                   <span className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-400 transition-colors duration-200">
                     #{license.id}
                   </span>

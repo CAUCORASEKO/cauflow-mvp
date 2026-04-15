@@ -7,7 +7,11 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/contexts/auth-context";
-import { formatLicenseType, formatLicenseUsage } from "@/lib/license-taxonomy";
+import {
+  formatLicenseSourceType,
+  formatLicenseType,
+  formatLicenseUsage
+} from "@/lib/license-taxonomy";
 import { buyerNav } from "@/lib/platform-nav";
 import { formatCurrency, humanizeLabel } from "@/lib/utils";
 import {
@@ -211,7 +215,9 @@ function ExplorePackCard({
             </p>
             <p className="text-sm text-slate-300">
               {pack.license
-                ? formatLicenseUsage(pack.license.usage)
+                ? `${formatLicenseUsage(pack.license.usage)} · ${formatLicenseSourceType(
+                    pack.license.sourceType
+                  )} rights`
                 : "Attach a pack license to sell this bundle."}
             </p>
           </div>

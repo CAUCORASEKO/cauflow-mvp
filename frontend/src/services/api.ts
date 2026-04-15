@@ -234,7 +234,9 @@ export const fetchLicenseById = async (licenseId: number) => {
 };
 
 export const createLicense = async (input: {
-  assetId: number;
+  sourceType: License["sourceType"];
+  sourceAssetId?: number | null;
+  sourcePackId?: number | null;
   type: string;
   price: number;
   usage: string;
