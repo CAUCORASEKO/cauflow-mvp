@@ -353,11 +353,15 @@ export const getAssetPublishBlockedReasons = ({
   return blockedReasons;
 };
 
+const resolveAssetCatalogStatus = (row) => row.asset_status || row.status || "draft";
+
+const resolveAssetOfferClass = (row) => row.asset_offer_class || row.offer_class || "premium";
+
 export const getAssetPublicationState = (row) => {
   const previewUrl = row.preview_image_url || row.image_url || null;
-  const catalogStatus = row.status || row.asset_status || "draft";
+  const catalogStatus = resolveAssetCatalogStatus(row);
   const reviewStatus = normalizeAssetReviewStatus(row.review_status, "draft");
-  const offerClass = normalizeAssetOfferClass(row.offer_class, "premium");
+  const offerClass = normalizeAssetOfferClass(resolveAssetOfferClass(row), "premium");
   const masterFile = buildAssetFileSummary({
     url: row.master_file_url,
     fileName: row.master_file_name,

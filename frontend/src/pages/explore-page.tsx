@@ -144,7 +144,11 @@ function ExploreAssetCard({
             <div className="flex items-center justify-between gap-4">
               <span className="text-slate-500">Offer</span>
               <span className="text-white">
-                {selectedLicense ? formatOfferClass(selectedLicense.offerClass) : "Unavailable"}
+                {selectedLicense
+                  ? selectedLicense.offerClass === "free_use"
+                    ? "Free use · Non-premium"
+                    : formatOfferClass(selectedLicense.offerClass)
+                  : "Unavailable"}
               </span>
             </div>
             <div className="flex items-center justify-between gap-4">
@@ -152,7 +156,7 @@ function ExploreAssetCard({
               <span className="font-semibold text-white">
                 {selectedLicense
                   ? selectedLicense.offerClass === "free_use"
-                    ? "Free"
+                    ? "Free · $0"
                     : formatCurrency(Number(selectedLicense.price))
                   : "Unavailable"}
               </span>
@@ -176,7 +180,7 @@ function ExploreAssetCard({
           <p className="flex items-center gap-2 text-sm text-slate-400">
             <ShieldCheck className="h-4 w-4 text-sky-200" />
             {isFreeUse
-              ? "Free use grants basic asset access. No premium delivery is included."
+              ? "Free use grants basic asset access. Non-premium, zero-cost offer. No premium delivery is included."
               : "Active rights are granted after payment succeeds."}
           </p>
           {user ? (

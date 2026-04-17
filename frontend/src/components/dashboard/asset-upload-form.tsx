@@ -111,8 +111,8 @@ export function AssetUploadForm({
               Upload new asset
             </h3>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
-              Build a premium catalog listing with a public preview, a protected delivery file,
-              and clear workflow gates from draft through publication.
+              Create either a premium listing or a free-use offer with the right preview,
+              delivery, and publication path from the start.
             </p>
           </div>
           <div className="hidden h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-sky-200 md:flex">
@@ -395,15 +395,28 @@ export function AssetUploadForm({
             step="04"
             eyebrow="Review Workflow"
             title="Review workflow"
-            description="Only delivery-ready assets can move into premium review. Only approved assets can be published."
+            description={
+              offerClass === "free_use"
+                ? "Free-use assets skip premium review. Publish them later when you want them buyer-visible in Explore."
+                : "Only delivery-ready assets can move into premium review. Only approved assets can be published."
+            }
           >
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {[
-                ["Draft", "This asset is still being prepared for review."],
-                ["In review", "This asset is currently under premium catalog review."],
-                ["Approved", "This asset has passed review and is eligible for publication."],
-                ["Rejected", "This asset needs changes before it can enter the premium catalog."]
-              ].map(([label, helper]) => (
+              {(
+                offerClass === "free_use"
+                  ? [
+                      ["Draft", "Free-use offer is hidden until you publish it."],
+                      ["Published", "Free-use offer becomes buyer-visible in Explore."],
+                      ["Archived", "Free-use offer is removed from Explore."],
+                      ["Premium path", "Switch back to premium if you want review and paid delivery."]
+                    ]
+                  : [
+                      ["Draft", "This asset is still being prepared for review."],
+                      ["In review", "This asset is currently under premium catalog review."],
+                      ["Approved", "This asset has passed review and is eligible for publication."],
+                      ["Rejected", "This asset needs changes before it can enter the premium catalog."]
+                    ]
+              ).map(([label, helper]) => (
                 <div
                   key={label}
                   className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4"
@@ -419,14 +432,26 @@ export function AssetUploadForm({
             step="05"
             eyebrow="Publication Status"
             title="Publication status"
-            description="Published assets are visible to buyers only when they are both approved and delivery ready."
+            description={
+              offerClass === "free_use"
+                ? "Free-use assets become buyer-visible when you publish the catalog entry."
+                : "Published assets are visible to buyers only when they are both approved and delivery ready."
+            }
           >
             <div className="grid gap-3 sm:grid-cols-3">
-              {[
-                "This asset must be approved before it can be published.",
-                "This asset still needs delivery fixes before it can go live.",
-                "Only approved, delivery-ready assets are visible to buyers."
-              ].map((item) => (
+              {(
+                offerClass === "free_use"
+                  ? [
+                      "A free-use asset can be published even if premium delivery readiness is still marked needs fixes.",
+                      "Free-use publication does not wait on premium review approval.",
+                      "Only published free-use assets appear in buyer Explore."
+                    ]
+                  : [
+                      "This asset must be approved before it can be published.",
+                      "This asset still needs delivery fixes before it can go live.",
+                      "Only approved, delivery-ready assets are visible to buyers."
+                    ]
+              ).map((item) => (
                 <div
                   key={item}
                   className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4 text-sm leading-6 text-slate-300"

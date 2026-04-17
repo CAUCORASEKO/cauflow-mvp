@@ -422,7 +422,7 @@ export function DashboardPage() {
         message:
           deleteError instanceof Error ? deleteError.message : "Unable to delete asset",
         detail:
-          "If this asset is already used in packs, licenses, or commercial history, remove the dependency before deleting."
+          "Unused assets delete cleanly. If CauFlow finds commercial history or an unsafe active pack dependency, archive or unpublish the asset instead."
       });
     } finally {
       setIsDeletingAsset(false);
@@ -524,7 +524,7 @@ export function DashboardPage() {
         message:
           deleteError instanceof Error ? deleteError.message : "Unable to delete license",
         detail:
-          "Purchased or granted licenses stay protected. Remove non-commercial dependencies before deleting."
+          "Unused licenses delete cleanly. Purchased, granted, or paid rights packages stay preserved and should be archived instead."
       });
     } finally {
       setIsDeletingLicense(false);
@@ -594,7 +594,7 @@ export function DashboardPage() {
         message:
           deleteError instanceof Error ? deleteError.message : "Unable to delete pack",
         detail:
-          "Packs with purchase or grant history stay protected so commercial records remain intact."
+          "Unused packs delete cleanly. Packs with purchase, grant, or payment history stay preserved and should be archived instead."
       });
     } finally {
       setIsDeletingPack(false);
@@ -624,16 +624,16 @@ export function DashboardPage() {
     ).length;
 
     const segments = [];
-    if (linkedLicenseCount > 0) segments.push(`${linkedLicenseCount} linked licenses`);
-    if (packCoverCount > 0) segments.push(`${packCoverCount} pack covers`);
-    if (packInclusionCount > 0) segments.push(`${packInclusionCount} pack inclusions`);
     if (purchaseCount > 0) segments.push(`${purchaseCount} commercial records`);
+    if (packCoverCount > 0) segments.push(`${packCoverCount} pack covers`);
+    if (packInclusionCount > 0) segments.push(`${packInclusionCount} pack relationships`);
+    if (linkedLicenseCount > 0) segments.push(`${linkedLicenseCount} linked licenses`);
 
     return segments.length > 0
       ? `This asset is currently connected to ${formatDependencySummary(
           segments
-        )}. CauFlow will block deletion while those dependencies exist.`
-      : "This action permanently removes the asset from the creator catalog. This action cannot be undone.";
+        )}. Unused dependencies can still delete cleanly, but any commercial history or unsafe pack relationship will block hard-delete and require archive or unpublish instead.`
+      : "This action permanently removes the asset from the creator catalog. It is intended only for unused records and cannot be undone.";
   }, [assetPendingDelete, licenses, packs, purchases]);
 
   const licenseDeleteDescription = useMemo(() => {
@@ -653,8 +653,8 @@ export function DashboardPage() {
     return segments.length > 0
       ? `This license is currently referenced by ${formatDependencySummary(
           segments
-        )}. Purchased or bundled rights packages cannot be removed.`
-      : "This action permanently removes the rights package from the creator catalog. This action cannot be undone.";
+        )}. Unused attached packs can detach automatically, but any commercial history will block deletion and preserve the rights trail.`
+      : "This action permanently removes the rights package from the creator catalog. It is intended only for unused records and cannot be undone.";
   }, [licensePendingDelete, packs, purchases]);
 
   const packDeleteDescription = useMemo(() => {
@@ -667,8 +667,8 @@ export function DashboardPage() {
     ).length;
 
     return purchaseCount > 0
-      ? `This pack is already tied to ${purchaseCount} commercial records. CauFlow will block deletion so purchase and grant history stays intact.`
-      : "This action removes the pack and its bundle structure from the catalog. Existing assets and licenses will stay intact.";
+      ? `This pack is already tied to ${purchaseCount} commercial records. CauFlow will preserve the pack history and require archive or unpublish instead of hard-delete.`
+      : "This action removes the pack and its bundle structure from the catalog. It is intended only for unused records; existing assets and licenses otherwise stay intact.";
   }, [packPendingDelete, purchases]);
 
   const hasAssetFilters =

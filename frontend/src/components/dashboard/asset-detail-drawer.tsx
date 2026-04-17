@@ -50,8 +50,9 @@ import {
 } from "@/lib/offer-class";
 import {
   formatAssetReviewStatus,
+  getAssetPublicationSummary,
   getAssetPublishGateCopy,
-  getAssetReviewBadgeClassName,
+  getCreatorAssetReviewPresentation,
   getAssetReviewHelperCopy
 } from "@/lib/asset-review";
 import { formatVisualAssetType, visualAssetTypeOptions } from "@/lib/visual-taxonomy";
@@ -61,6 +62,12 @@ const reviewWorkflowStates = [
   ["In review", "This asset is currently under premium catalog review."],
   ["Approved", "This asset has passed review and is eligible for publication."],
   ["Rejected", "This asset needs changes before it can enter the premium catalog."]
+] as const;
+
+const freeUseLifecycleStates = [
+  ["Draft", "Hidden from buyers until you publish the free-use offer."],
+  ["Published", "Visible to buyers in Explore without premium review or premium delivery gating."],
+  ["Archived", "Removed from Explore while preserving the free-use offer record."]
 ] as const;
 
 const getNextWorkflowAction = (asset: Asset) => {
@@ -89,39 +96,6 @@ const getNextWorkflowAction = (asset: Asset) => {
   }
 
   return "Review asset detail";
-};
-
-const getPublicationDecisionState = (asset: Asset) => {
-  if (asset.status === "published" && asset.canPublish) {
-    return {
-      label: "Publish status",
-      value: asset.offerClass === "free_use" ? "Free live" : "Live",
-      detail:
-        asset.offerClass === "free_use"
-          ? "This free-use asset is live in the marketplace."
-          : "This asset is live in the marketplace.",
-      toneClassName: "border-emerald-400/20 bg-emerald-400/[0.08] text-emerald-100"
-    };
-  }
-
-  if (asset.canPublish) {
-    return {
-      label: "Publish eligibility",
-      value: "Ready",
-      detail:
-        asset.offerClass === "free_use"
-          ? "This asset is ready for free-use publication."
-          : "This asset is ready for marketplace publication.",
-      toneClassName: "border-sky-300/18 bg-sky-300/[0.08] text-sky-100"
-    };
-  }
-
-  return {
-    label: "Publish eligibility",
-    value: "Blocked",
-    detail: "This asset cannot go live yet.",
-    toneClassName: "border-amber-300/18 bg-amber-300/[0.08] text-amber-100"
-  };
 };
 
 function GuidanceCard({ title, copy }: { title: string; copy: string }) {
@@ -353,7 +327,8 @@ export function AssetDetailDrawer({
   const publishGateCopy = asset ? getAssetPublishGateCopy(asset) : "";
   const publishBlockedReasons = asset?.publishBlockedReasons || [];
   const nextWorkflowAction = asset ? getNextWorkflowAction(asset) : "";
-  const publicationDecisionState = asset ? getPublicationDecisionState(asset) : null;
+  const publicationDecisionState = asset ? getAssetPublicationSummary(asset) : null;
+  const creatorReviewPresentation = asset ? getCreatorAssetReviewPresentation(asset) : null;
   const canSubmitForReview =
     asset?.offerClass === "premium" &&
     Boolean(asset?.deliveryReadiness?.isReady) &&
@@ -541,7 +516,9 @@ export function AssetDetailDrawer({
       setReviewNote(updatedAsset.reviewNote || "");
       setSaveFeedback(
         nextReviewStatus === "approved"
-          ? "Asset approved and ready for publication."
+          ? updatedAsset.status === "published"
+            ? "Asset approved and remains published."
+            : "Asset approved and ready for publication."
           : nextReviewStatus === "rejected"
             ? "Asset rejected. Review note saved."
             : "Asset moved back to draft."
@@ -654,9 +631,9 @@ export function AssetDetailDrawer({
                   </p>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <span
-                      className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${publicationDecisionState?.toneClassName}`}
+                      className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${publicationDecisionState?.badgeClassName}`}
                     >
-                      {publicationDecisionState?.label}: {publicationDecisionState?.value}
+                      Commercial state: {publicationDecisionState?.pillLabel}
                     </span>
                     <span
                       className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getCatalogStatusBadgeClassName(
@@ -688,11 +665,9 @@ export function AssetDetailDrawer({
                   </p>
                   <p className="mt-2 text-sm font-medium text-white">{reviewHelperCopy}</p>
                   <span
-                    className={`mt-3 inline-flex rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetReviewBadgeClassName(
-                      reviewStatus
-                    )}`}
+                    className={`mt-3 inline-flex rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${creatorReviewPresentation?.badgeClassName}`}
                   >
-                    {formatAssetReviewStatus(reviewStatus)}
+                    {creatorReviewPresentation?.label || formatAssetReviewStatus(reviewStatus)}
                   </span>
                 </div>
                 <div className="rounded-[22px] border border-white/8 bg-white/[0.025] p-4">
@@ -1047,16 +1022,16 @@ export function AssetDetailDrawer({
                           Current review state
                         </p>
                         <p className="mt-2 text-xl font-display text-white">
-                          {formatAssetReviewStatus(reviewStatus)}
+                          {creatorReviewPresentation?.label || formatAssetReviewStatus(reviewStatus)}
                         </p>
                         <p className="mt-3 text-sm leading-6 text-slate-300">{reviewHelperCopy}</p>
                       </div>
                       <span
-                        className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetReviewBadgeClassName(
-                          reviewStatus
-                        )}`}
+                        className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${creatorReviewPresentation?.badgeClassName}`}
                       >
-                        {reviewStatus === "approved"
+                        {asset.offerClass === "free_use"
+                          ? "Review bypassed"
+                          : reviewStatus === "approved"
                           ? "Eligible for publication"
                           : reviewStatus === "in_review"
                             ? "Under review"
@@ -1159,7 +1134,10 @@ export function AssetDetailDrawer({
                   </div>
 
                   <div className="grid gap-3 sm:grid-cols-2">
-                    {reviewWorkflowStates.map(([label, helper]) => (
+                    {(asset.offerClass === "free_use"
+                      ? freeUseLifecycleStates
+                      : reviewWorkflowStates
+                    ).map(([label, helper]) => (
                       <div
                         key={label}
                         className="rounded-[22px] border border-white/8 bg-slate-950/35 p-4"
@@ -1178,25 +1156,29 @@ export function AssetDetailDrawer({
                 step="05"
                 eyebrow="Publication Status"
                 title="Publication status"
-                description="Published assets are visible to buyers only when they are both approved and delivery ready."
+                description={
+                  asset.offerClass === "free_use"
+                    ? "Free-use assets become buyer-visible when their catalog status is published."
+                    : "Published assets are visible to buyers only when they are both approved and delivery ready."
+                }
               >
                 <div className="space-y-4">
                   <div className="rounded-[24px] border border-white/8 bg-slate-950/55 p-5">
                     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                       <div>
                         <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
-                          {publicationDecisionState?.label}
+                          Commercial state
                         </p>
                         <p className="mt-2 text-xl font-display text-white">
-                          {publicationDecisionState?.value}
+                          {publicationDecisionState?.label}
                         </p>
                         <p className="mt-3 text-sm text-white">{publicationDecisionState?.detail}</p>
                         <p className="mt-2 text-sm leading-6 text-slate-400">{publishGateCopy}</p>
                       </div>
                       <span
-                        className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${publicationDecisionState?.toneClassName}`}
+                        className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${publicationDecisionState?.badgeClassName}`}
                       >
-                        {publicationDecisionState?.label}: {publicationDecisionState?.value}
+                        Commercial state: {publicationDecisionState?.pillLabel}
                       </span>
                     </div>
 
@@ -1209,11 +1191,9 @@ export function AssetDetailDrawer({
                         Catalog: {formatCatalogStatus(asset.status)}
                       </span>
                       <span
-                        className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetReviewBadgeClassName(
-                          reviewStatus
-                        )}`}
+                        className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] ${creatorReviewPresentation?.badgeClassName}`}
                       >
-                        Review: {formatAssetReviewStatus(reviewStatus)}
+                        Review: {creatorReviewPresentation?.label || formatAssetReviewStatus(reviewStatus)}
                       </span>
                       <span
                         className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetDeliveryBadgeClassName(
@@ -1225,9 +1205,11 @@ export function AssetDetailDrawer({
                     </div>
 
                     <div className="mt-5 flex flex-wrap gap-2">
-                      {(publishBlockedReasons.length > 0
-                        ? publishBlockedReasons.map((reason) => `Blocking reason: ${reason}`)
-                        : ["This asset is ready for marketplace publication."]).map((reason) => (
+                      {(
+                        publishBlockedReasons.length > 0
+                          ? publishBlockedReasons.map((reason) => `Blocking reason: ${reason}`)
+                          : [publishGateCopy]
+                      ).map((reason) => (
                         <span
                           key={reason}
                           className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-300"
@@ -1372,8 +1354,9 @@ export function AssetDetailDrawer({
                     <p className="text-sm font-medium">Delete asset</p>
                   </div>
                   <p className="mt-1 text-sm leading-6 text-slate-400">
-                    CauFlow blocks deletion when this asset is already used by packs, licenses, or
-                    commercial history. Remove the dependency before deleting.
+                    Unused assets can be deleted. Once this asset has commercial history or is
+                    still required by an active pack relationship, CauFlow preserves it and you
+                    should archive or unpublish it instead.
                   </p>
                 </div>
                 <Button

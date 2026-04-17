@@ -3,7 +3,10 @@ import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import { normalizeResponseData } from "../utils/normalize-response.js";
-import { buildAssetDeleteBlockMessage } from "../utils/delete-constraints.js";
+import {
+  buildAssetDeleteBlockMessage,
+  getAssetDeleteDependencyState
+} from "../utils/delete-constraints.js";
 import {
   buildStoredAssetFilePayload,
   getAssetPublicationState,
@@ -25,6 +28,8 @@ const VISUAL_TYPES = new Set([
   "brand_visual"
 ]);
 const ASSET_STATUSES = new Set(["draft", "published", "archived"]);
+const DEFAULT_FREE_USE_LICENSE_TYPE = "Free use";
+const DEFAULT_FREE_USE_LICENSE_USAGE = "General";
 
 const normalizeVisualType = (value, fallback = DEFAULT_VISUAL_TYPE) => {
   if (typeof value !== "string" || value.trim().length === 0) {
@@ -59,8 +64,8 @@ const normalizeAssetStatus = (value, fallback = "draft") => {
   return normalizedValue;
 };
 
-const fetchOwnedAsset = async (assetId, user) =>
-  pool.query(
+const fetchOwnedAsset = async (db, assetId, user) =>
+  db.query(
     `
     SELECT * FROM assets
     WHERE id = $1
@@ -77,6 +82,106 @@ const ensureAssetCanPublish = (row) => {
   }
 
   return publicationState;
+};
+
+const getFreeUseLicenseStatusForAsset = (assetStatus) => {
+  if (assetStatus === "published") {
+    return "published";
+  }
+
+  if (assetStatus === "archived") {
+    return "archived";
+  }
+
+  return "draft";
+};
+
+const syncFreeUseAssetLicense = async (db, assetRow) => {
+  const assetId = Number(assetRow.id);
+
+  if (!Number.isInteger(assetId) || assetId <= 0) {
+    return;
+  }
+
+  const ownerUserId = assetRow.owner_user_id || null;
+  const inactiveStatus =
+    assetRow.status === "archived" ? "archived" : "draft";
+
+  if (normalizeAssetOfferClass(assetRow.offer_class, "premium") !== "free_use") {
+    await db.query(
+      `
+      UPDATE licenses
+      SET status = $2,
+          owner_user_id = COALESCE($3, owner_user_id)
+      WHERE COALESCE(source_type, 'asset') = 'asset'
+        AND COALESCE(source_asset_id, asset_id) = $1
+        AND COALESCE(offer_class, 'premium') = 'free_use'
+      `,
+      [assetId, inactiveStatus, ownerUserId]
+    );
+
+    return;
+  }
+
+  const desiredStatus = getFreeUseLicenseStatusForAsset(assetRow.status);
+  const existingLicenseResult = await db.query(
+    `
+    SELECT id
+    FROM licenses
+    WHERE COALESCE(source_type, 'asset') = 'asset'
+      AND COALESCE(source_asset_id, asset_id) = $1
+      AND COALESCE(offer_class, 'premium') = 'free_use'
+    ORDER BY id ASC
+    `,
+    [assetId]
+  );
+
+  if (existingLicenseResult.rows.length === 0) {
+    await db.query(
+      `
+      INSERT INTO licenses (
+        asset_id,
+        source_type,
+        source_asset_id,
+        source_pack_id,
+        type,
+        price,
+        usage,
+        offer_class,
+        status,
+        owner_user_id
+      )
+      VALUES ($1, 'asset', $1, NULL, $2, 0, $3, 'free_use', $4, $5)
+      `,
+      [
+        assetId,
+        DEFAULT_FREE_USE_LICENSE_TYPE,
+        DEFAULT_FREE_USE_LICENSE_USAGE,
+        desiredStatus,
+        ownerUserId
+      ]
+    );
+
+    return;
+  }
+
+  await db.query(
+    `
+    UPDATE licenses
+    SET asset_id = $2,
+        source_type = 'asset',
+        source_asset_id = $2,
+        source_pack_id = NULL,
+        price = 0,
+        offer_class = 'free_use',
+        status = $3,
+        owner_user_id = COALESCE($4, owner_user_id)
+    WHERE COALESCE(source_type, 'asset') = 'asset'
+      AND COALESCE(source_asset_id, asset_id) = $1
+      AND COALESCE(offer_class, 'premium') = 'free_use'
+    `,
+    [assetId, assetId, desiredStatus, ownerUserId]
+  );
 };
 
 const getUploadedFiles = (req) => {
@@ -180,6 +285,9 @@ const isClientInputError = (message = "") =>
   ].some((segment) => message.includes(segment));
 
 export const uploadAsset = async (req, res) => {
+  const client = await pool.connect();
+  let transactionStarted = false;
+
   try {
     const { title, description, visualType, status, offerClass } = req.body;
     const { previewImage, masterFile } = getUploadedFiles(req);
@@ -229,7 +337,10 @@ export const uploadAsset = async (req, res) => {
       ensureAssetCanPublish(candidateAsset);
     }
 
-    const result = await pool.query(
+    await client.query("BEGIN");
+    transactionStarted = true;
+
+    const result = await client.query(
       `
       INSERT INTO assets (
         title,
@@ -289,11 +400,19 @@ export const uploadAsset = async (req, res) => {
       ]
     );
 
+    await syncFreeUseAssetLicense(client, result.rows[0]);
+    await client.query("COMMIT");
+    transactionStarted = false;
+
     res.status(201).json({
       message: "Asset uploaded successfully",
       data: normalizeResponseData(serializeAssetRecord(result.rows[0]))
     });
   } catch (error) {
+    if (transactionStarted) {
+      await client.query("ROLLBACK");
+    }
+
     await cleanupUploadedRequestFiles(req);
 
     const statusCode = isClientInputError(error.message) ? 400 : 500;
@@ -302,6 +421,8 @@ export const uploadAsset = async (req, res) => {
       message: statusCode === 400 ? "Invalid asset input" : "Error creating asset",
       error: error.message
     });
+  } finally {
+    client.release();
   }
 };
 
@@ -417,124 +538,144 @@ export const updateAsset = async (req, res) => {
       });
     }
 
-    const existingAssetResult = await fetchOwnedAsset(assetId, req.user);
+    const client = await pool.connect();
+    let transactionStarted = false;
 
-    if (existingAssetResult.rows.length === 0) {
-      await cleanupUploadedRequestFiles(req);
+    try {
+      const existingAssetResult = await fetchOwnedAsset(client, assetId, req.user);
 
-      return res.status(404).json({
-        message: "Asset not found"
+      if (existingAssetResult.rows.length === 0) {
+        await cleanupUploadedRequestFiles(req);
+
+        return res.status(404).json({
+          message: "Asset not found"
+        });
+      }
+
+      const existingAsset = existingAssetResult.rows[0];
+      const normalizedVisualType = normalizeVisualType(
+        visualType,
+        existingAsset.visual_type || DEFAULT_VISUAL_TYPE
+      );
+      const normalizedStatus = normalizeAssetStatus(status, existingAsset.status || "published");
+      const normalizedOfferClass = normalizeAssetOfferClass(
+        offerClass,
+        existingAsset.offer_class || "premium"
+      );
+
+      const previewPayload = previewImage ? await buildStoredAssetFilePayload(previewImage) : null;
+      const masterPayload = masterFile ? await buildStoredAssetFilePayload(masterFile) : null;
+      const nextPreviewValues = previewPayload
+        ? buildPreviewValues(previewPayload)
+        : buildExistingPreviewValues(existingAsset);
+      const nextMasterValues = masterPayload
+        ? buildMasterValues(masterPayload)
+        : buildExistingMasterValues(existingAsset);
+      const candidateAsset = {
+        ...existingAsset,
+        image_url: nextPreviewValues.imageUrl,
+        preview_image_url: nextPreviewValues.previewImageUrl,
+        master_file_url: nextMasterValues.masterFileUrl,
+        master_file_name: nextMasterValues.masterFileName,
+        master_mime_type: nextMasterValues.masterMimeType,
+        master_file_size: nextMasterValues.masterFileSize,
+        master_width: nextMasterValues.masterWidth,
+        master_height: nextMasterValues.masterHeight,
+        master_aspect_ratio: nextMasterValues.masterAspectRatio,
+        master_resolution_summary: nextMasterValues.masterResolutionSummary,
+        offer_class: normalizedOfferClass,
+        review_status: existingAsset.review_status,
+        status: normalizedStatus
+      };
+
+      if (normalizedStatus === "published") {
+        ensureAssetCanPublish(candidateAsset);
+      }
+
+      await client.query("BEGIN");
+      transactionStarted = true;
+
+      const updatedAssetResult = await client.query(
+        `
+        UPDATE assets
+        SET
+          title = $1,
+          description = $2,
+          image_url = $3,
+          preview_image_url = $4,
+          preview_file_name = $5,
+          preview_mime_type = $6,
+          preview_file_size = $7,
+          preview_width = $8,
+          preview_height = $9,
+          preview_aspect_ratio = $10,
+          preview_resolution_summary = $11,
+          master_file_url = $12,
+          master_file_name = $13,
+          master_mime_type = $14,
+          master_file_size = $15,
+          master_width = $16,
+          master_height = $17,
+          master_aspect_ratio = $18,
+          master_resolution_summary = $19,
+          offer_class = $20,
+          visual_type = $21,
+          status = $22
+        WHERE id = $23
+        RETURNING *
+        `,
+        [
+          normalizedTitle,
+          description || null,
+          nextPreviewValues.imageUrl,
+          nextPreviewValues.previewImageUrl,
+          nextPreviewValues.previewFileName,
+          nextPreviewValues.previewMimeType,
+          nextPreviewValues.previewFileSize,
+          nextPreviewValues.previewWidth,
+          nextPreviewValues.previewHeight,
+          nextPreviewValues.previewAspectRatio,
+          nextPreviewValues.previewResolutionSummary,
+          nextMasterValues.masterFileUrl,
+          nextMasterValues.masterFileName,
+          nextMasterValues.masterMimeType,
+          nextMasterValues.masterFileSize,
+          nextMasterValues.masterWidth,
+          nextMasterValues.masterHeight,
+          nextMasterValues.masterAspectRatio,
+          nextMasterValues.masterResolutionSummary,
+          normalizedOfferClass,
+          normalizedVisualType,
+          normalizedStatus,
+          assetId
+        ]
+      );
+
+      await syncFreeUseAssetLicense(client, updatedAssetResult.rows[0]);
+      await client.query("COMMIT");
+      transactionStarted = false;
+
+      if (previewPayload) {
+        await removeStoredUploadByUrl(existingAsset.preview_image_url || existingAsset.image_url);
+      }
+
+      if (masterPayload) {
+        await removeStoredUploadByUrl(existingAsset.master_file_url);
+      }
+
+      res.status(200).json({
+        message: "Asset saved successfully.",
+        data: normalizeResponseData(serializeAssetRecord(updatedAssetResult.rows[0]))
       });
+    } catch (error) {
+      if (transactionStarted) {
+        await client.query("ROLLBACK");
+      }
+
+      throw error;
+    } finally {
+      client.release();
     }
-
-    const existingAsset = existingAssetResult.rows[0];
-    const normalizedVisualType = normalizeVisualType(
-      visualType,
-      existingAsset.visual_type || DEFAULT_VISUAL_TYPE
-    );
-    const normalizedStatus = normalizeAssetStatus(status, existingAsset.status || "published");
-    const normalizedOfferClass = normalizeAssetOfferClass(
-      offerClass,
-      existingAsset.offer_class || "premium"
-    );
-
-    const previewPayload = previewImage ? await buildStoredAssetFilePayload(previewImage) : null;
-    const masterPayload = masterFile ? await buildStoredAssetFilePayload(masterFile) : null;
-    const nextPreviewValues = previewPayload
-      ? buildPreviewValues(previewPayload)
-      : buildExistingPreviewValues(existingAsset);
-    const nextMasterValues = masterPayload
-      ? buildMasterValues(masterPayload)
-      : buildExistingMasterValues(existingAsset);
-    const candidateAsset = {
-      ...existingAsset,
-      image_url: nextPreviewValues.imageUrl,
-      preview_image_url: nextPreviewValues.previewImageUrl,
-      master_file_url: nextMasterValues.masterFileUrl,
-      master_file_name: nextMasterValues.masterFileName,
-      master_mime_type: nextMasterValues.masterMimeType,
-      master_file_size: nextMasterValues.masterFileSize,
-      master_width: nextMasterValues.masterWidth,
-      master_height: nextMasterValues.masterHeight,
-      master_aspect_ratio: nextMasterValues.masterAspectRatio,
-      master_resolution_summary: nextMasterValues.masterResolutionSummary,
-      offer_class: normalizedOfferClass,
-      review_status: existingAsset.review_status,
-      status: normalizedStatus
-    };
-
-    if (normalizedStatus === "published") {
-      ensureAssetCanPublish(candidateAsset);
-    }
-
-    const updatedAssetResult = await pool.query(
-      `
-      UPDATE assets
-      SET
-        title = $1,
-        description = $2,
-        image_url = $3,
-        preview_image_url = $4,
-        preview_file_name = $5,
-        preview_mime_type = $6,
-        preview_file_size = $7,
-        preview_width = $8,
-        preview_height = $9,
-        preview_aspect_ratio = $10,
-        preview_resolution_summary = $11,
-        master_file_url = $12,
-        master_file_name = $13,
-        master_mime_type = $14,
-        master_file_size = $15,
-        master_width = $16,
-        master_height = $17,
-        master_aspect_ratio = $18,
-        master_resolution_summary = $19,
-        offer_class = $20,
-        visual_type = $21,
-        status = $22
-      WHERE id = $23
-      RETURNING *
-      `,
-      [
-        normalizedTitle,
-        description || null,
-        nextPreviewValues.imageUrl,
-        nextPreviewValues.previewImageUrl,
-        nextPreviewValues.previewFileName,
-        nextPreviewValues.previewMimeType,
-        nextPreviewValues.previewFileSize,
-        nextPreviewValues.previewWidth,
-        nextPreviewValues.previewHeight,
-        nextPreviewValues.previewAspectRatio,
-        nextPreviewValues.previewResolutionSummary,
-        nextMasterValues.masterFileUrl,
-        nextMasterValues.masterFileName,
-        nextMasterValues.masterMimeType,
-        nextMasterValues.masterFileSize,
-        nextMasterValues.masterWidth,
-        nextMasterValues.masterHeight,
-        nextMasterValues.masterAspectRatio,
-        nextMasterValues.masterResolutionSummary,
-        normalizedOfferClass,
-        normalizedVisualType,
-        normalizedStatus,
-        assetId
-      ]
-    );
-
-    if (previewPayload) {
-      await removeStoredUploadByUrl(existingAsset.preview_image_url || existingAsset.image_url);
-    }
-
-    if (masterPayload) {
-      await removeStoredUploadByUrl(existingAsset.master_file_url);
-    }
-
-    res.status(200).json({
-      message: "Asset saved successfully.",
-      data: normalizeResponseData(serializeAssetRecord(updatedAssetResult.rows[0]))
-    });
   } catch (error) {
     await cleanupUploadedRequestFiles(req);
 
@@ -548,10 +689,13 @@ export const updateAsset = async (req, res) => {
 };
 
 export const deleteAsset = async (req, res) => {
+  const client = await pool.connect();
+  let transactionStarted = false;
+
   try {
     const assetId = Number(req.params.id);
 
-    const assetResult = await pool.query(
+    const assetResult = await client.query(
       `
       SELECT *
       FROM assets
@@ -568,66 +712,19 @@ export const deleteAsset = async (req, res) => {
       });
     }
 
-    const [packCoverResult, packInclusionResult, licenseResult, purchaseResult, grantResult] =
-      await Promise.all([
-        pool.query(
-          `
-          SELECT COUNT(*)::int AS value
-          FROM packs
-          WHERE cover_asset_id = $1
-          `,
-          [assetId]
-        ),
-        pool.query(
-          `
-          SELECT COUNT(*)::int AS value
-          FROM pack_assets
-          WHERE asset_id = $1
-          `,
-          [assetId]
-        ),
-        pool.query(
-          `
-          SELECT COUNT(*)::int AS value
-          FROM licenses
-          WHERE COALESCE(source_asset_id, asset_id) = $1
-          `,
-          [assetId]
-        ),
-        pool.query(
-          `
-          SELECT COUNT(*)::int AS value
-          FROM purchases
-          WHERE asset_id = $1
-          `,
-          [assetId]
-        ),
-        pool.query(
-          `
-          SELECT COUNT(*)::int AS value
-          FROM license_grants
-          WHERE asset_id = $1
-          `,
-          [assetId]
-        )
-      ]);
+    const dependencyState = await getAssetDeleteDependencyState(client, assetId);
 
-    const dependencyCounts = {
-      packCoverCount: Number(packCoverResult.rows[0]?.value || 0),
-      packInclusionCount: Number(packInclusionResult.rows[0]?.value || 0),
-      licenseCount: Number(licenseResult.rows[0]?.value || 0),
-      purchaseCount: Number(purchaseResult.rows[0]?.value || 0),
-      grantCount: Number(grantResult.rows[0]?.value || 0)
-    };
-
-    if (Object.values(dependencyCounts).some((count) => count > 0)) {
+    if (!dependencyState.canDelete) {
       return res.status(409).json({
-        message: buildAssetDeleteBlockMessage(dependencyCounts),
+        message: buildAssetDeleteBlockMessage(dependencyState),
         code: "ASSET_DELETE_BLOCKED"
       });
     }
 
-    const result = await pool.query(
+    await client.query("BEGIN");
+    transactionStarted = true;
+
+    const result = await client.query(
       `
       DELETE FROM assets
       WHERE id = $1
@@ -638,12 +735,17 @@ export const deleteAsset = async (req, res) => {
     );
 
     if (result.rows.length === 0) {
+      await client.query("ROLLBACK");
+      transactionStarted = false;
       return res.status(404).json({
         message: "Asset not found"
       });
     }
 
     const deletedAsset = result.rows[0] || assetResult.rows[0];
+
+    await client.query("COMMIT");
+    transactionStarted = false;
 
     await Promise.all(
       [
@@ -659,17 +761,23 @@ export const deleteAsset = async (req, res) => {
       data: normalizeResponseData(serializeAssetRecord(deletedAsset))
     });
   } catch (error) {
+    if (transactionStarted) {
+      await client.query("ROLLBACK");
+    }
+
     res.status(500).json({
       message: "Error deleting asset",
       error: error.message
     });
+  } finally {
+    client.release();
   }
 };
 
 export const submitAssetForReview = async (req, res) => {
   try {
     const assetId = Number(req.params.id);
-    const assetResult = await fetchOwnedAsset(assetId, req.user);
+    const assetResult = await fetchOwnedAsset(pool, assetId, req.user);
 
     if (assetResult.rows.length === 0) {
       return res.status(404).json({
@@ -736,7 +844,7 @@ export const submitAssetForReview = async (req, res) => {
 export const updateAssetReview = async (req, res) => {
   try {
     const assetId = Number(req.params.id);
-    const assetResult = await fetchOwnedAsset(assetId, req.user);
+    const assetResult = await fetchOwnedAsset(pool, assetId, req.user);
 
     if (assetResult.rows.length === 0) {
       return res.status(404).json({

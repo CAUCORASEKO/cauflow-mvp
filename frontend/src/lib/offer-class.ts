@@ -10,5 +10,5 @@ export const getOfferClassBadgeClassName = (value: OfferClass) =>
 
 export const getOfferClassDescription = (value: OfferClass) =>
   value === "free_use"
-    ? "Visible in buyer surfaces at zero cost. No premium delivery promise."
+    ? "Visible in buyer surfaces as a non-premium zero-cost offer. No premium delivery promise."
     : "Reviewed, quality-gated commercial licensing with premium delivery eligibility.";

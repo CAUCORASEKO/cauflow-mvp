@@ -4,42 +4,17 @@ import type { Asset, License, Purchase } from "@/types/api";
 import {
   formatAssetDeliveryStatus,
   getAssetDeliveryBadgeClassName,
-  getAssetPreviewUrl,
-  getAssetPrimaryReadinessNote
+  getAssetPreviewUrl
 } from "@/lib/asset-delivery";
 import {
-  formatAssetReviewStatus,
-  getAssetReviewBadgeClassName
+  getAssetPublicationSummary,
+  getCreatorAssetReviewPresentation
 } from "@/lib/asset-review";
 import { formatDate } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import type { AssetViewMode } from "@/components/dashboard/asset-inventory-toolbar";
 import { formatCatalogStatus, getCatalogStatusBadgeClassName } from "@/lib/catalog-lifecycle";
 import { formatVisualAssetType } from "@/lib/visual-taxonomy";
-
-const getAssetPublicationSummary = (asset: Asset) => {
-  if (asset.status === "published" && asset.canPublish) {
-    return {
-      label: "Live in marketplace",
-      detail: "Visible to buyers now.",
-      badgeClassName: "border-emerald-400/20 bg-emerald-400/[0.08] text-emerald-100"
-    };
-  }
-
-  if (asset.canPublish) {
-    return {
-      label: "Ready for publication",
-      detail: "Approved and delivery ready.",
-      badgeClassName: "border-sky-300/18 bg-sky-300/[0.08] text-sky-100"
-    };
-  }
-
-  return {
-    label: "Publication blocked",
-    detail: asset.publishBlockedReasons?.[0] || getAssetPrimaryReadinessNote(asset),
-    badgeClassName: "border-amber-300/18 bg-amber-300/[0.08] text-amber-100"
-  };
-};
 
 export function AssetsGrid({
   assets,
@@ -107,8 +82,8 @@ export function AssetsGrid({
         const licenseCount = licenseCountByAssetId.get(asset.id) || 0;
         const purchaseCount = purchaseCountByAssetId.get(asset.id) || 0;
         const deliveryStatus = asset.deliveryReadiness?.status;
-        const reviewStatus = asset.reviewStatus;
         const publicationSummary = getAssetPublicationSummary(asset);
+        const reviewPresentation = getCreatorAssetReviewPresentation(asset);
         const quickActionLabel =
           asset.status === "published"
             ? "Unpublish"
@@ -230,11 +205,9 @@ export function AssetsGrid({
                           </p>
                           <div className="mt-2">
                             <span
-                              className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetReviewBadgeClassName(
-                                reviewStatus
-                              )}`}
+                              className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] ${reviewPresentation.badgeClassName}`}
                             >
-                              {formatAssetReviewStatus(reviewStatus)}
+                              {reviewPresentation.label}
                             </span>
                           </div>
                         </div>
@@ -368,20 +341,14 @@ export function AssetsGrid({
                       <span
                         className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] ${publicationSummary.badgeClassName}`}
                       >
-                        {asset.status === "published" && asset.canPublish
-                          ? "Live"
-                          : asset.canPublish
-                            ? "Ready"
-                            : "Blocked"}
+                        {publicationSummary.pillLabel}
                       </span>
                     </div>
                     <div className="mt-4 flex flex-wrap gap-2">
                       <span
-                        className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetReviewBadgeClassName(
-                          reviewStatus
-                        )}`}
+                        className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] ${reviewPresentation.badgeClassName}`}
                       >
-                        Review: {formatAssetReviewStatus(reviewStatus)}
+                        Review: {reviewPresentation.label}
                       </span>
                       <span
                         className={`rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] ${getAssetDeliveryBadgeClassName(

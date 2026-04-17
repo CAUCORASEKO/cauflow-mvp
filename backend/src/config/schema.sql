@@ -301,6 +301,57 @@ SET asset_id = NULL
 WHERE source_type = 'pack'
   AND asset_id IS NOT NULL;
 
+UPDATE licenses l
+SET price = 0,
+    status = CASE
+      WHEN a.offer_class = 'free_use' AND a.status = 'published' THEN 'published'
+      WHEN a.offer_class = 'free_use' AND a.status = 'archived' THEN 'archived'
+      WHEN a.offer_class = 'free_use' THEN 'draft'
+      WHEN a.status = 'archived' THEN 'archived'
+      ELSE 'draft'
+    END
+FROM assets a
+WHERE COALESCE(l.source_type, 'asset') = 'asset'
+  AND COALESCE(l.source_asset_id, l.asset_id) = a.id
+  AND COALESCE(l.offer_class, 'premium') = 'free_use';
+
+INSERT INTO licenses (
+  asset_id,
+  source_type,
+  source_asset_id,
+  source_pack_id,
+  type,
+  price,
+  usage,
+  offer_class,
+  status,
+  owner_user_id
+)
+SELECT
+  a.id,
+  'asset',
+  a.id,
+  NULL,
+  'Free use',
+  0,
+  'General',
+  'free_use',
+  CASE
+    WHEN a.status = 'published' THEN 'published'
+    WHEN a.status = 'archived' THEN 'archived'
+    ELSE 'draft'
+  END,
+  a.owner_user_id
+FROM assets a
+WHERE a.offer_class = 'free_use'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM licenses l
+    WHERE COALESCE(l.source_type, 'asset') = 'asset'
+      AND COALESCE(l.source_asset_id, l.asset_id) = a.id
+      AND COALESCE(l.offer_class, 'premium') = 'free_use'
+  );
+
 DO $$
 BEGIN
   ALTER TABLE licenses

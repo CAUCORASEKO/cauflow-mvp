@@ -4,7 +4,10 @@ import {
   getDefaultLicensePolicy,
   validateAndBuildPolicy
 } from "../utils/license-policy.js";
-import { buildLicenseDeleteBlockMessage } from "../utils/delete-constraints.js";
+import {
+  buildLicenseDeleteBlockMessage,
+  getLicenseDeleteDependencyState
+} from "../utils/delete-constraints.js";
 import { normalizeAssetOfferClass } from "../utils/asset-delivery.js";
 
 const LICENSE_STATUSES = new Set(["draft", "published", "archived"]);
@@ -637,10 +640,13 @@ export const updateLicense = async (req, res) => {
 };
 
 export const deleteLicense = async (req, res) => {
+  const client = await pool.connect();
+  let transactionStarted = false;
+
   try {
     const licenseId = Number(req.params.id);
 
-    const licenseResult = await pool.query(
+    const licenseResult = await client.query(
       `
       SELECT *
       FROM licenses
@@ -657,51 +663,19 @@ export const deleteLicense = async (req, res) => {
       });
     }
 
-    const [packResult, purchaseResult, grantResult] = await Promise.all([
-      pool.query(
-        `
-        SELECT COUNT(*)::int AS value
-        FROM packs
-        WHERE license_id = $1
-        `,
-        [licenseId]
-      ),
-      pool.query(
-        `
-        SELECT COUNT(*)::int AS value
-        FROM purchases
-        WHERE license_id = $1
-        `,
-        [licenseId]
-      ),
-      pool.query(
-        `
-        SELECT COUNT(*)::int AS value
-        FROM license_grants
-        WHERE license_id = $1
-        `,
-        [licenseId]
-      )
-    ]);
+    const dependencyState = await getLicenseDeleteDependencyState(client, licenseId);
 
-    const dependencyCounts = {
-      packCount: Number(packResult.rows[0]?.value || 0),
-      purchaseCount: Number(purchaseResult.rows[0]?.value || 0),
-      grantCount: Number(grantResult.rows[0]?.value || 0)
-    };
-
-    if (
-      dependencyCounts.packCount > 0 ||
-      dependencyCounts.purchaseCount > 0 ||
-      dependencyCounts.grantCount > 0
-    ) {
+    if (!dependencyState.canDelete) {
       return res.status(409).json({
-        message: buildLicenseDeleteBlockMessage(dependencyCounts),
+        message: buildLicenseDeleteBlockMessage(dependencyState),
         code: "LICENSE_DELETE_BLOCKED"
       });
     }
 
-    const result = await pool.query(
+    await client.query("BEGIN");
+    transactionStarted = true;
+
+    const result = await client.query(
       `
       DELETE FROM licenses
       WHERE id = $1
@@ -711,14 +685,23 @@ export const deleteLicense = async (req, res) => {
       [licenseId, req.user.role, req.user.id]
     );
 
+    await client.query("COMMIT");
+    transactionStarted = false;
+
     res.status(200).json({
       message: "License deleted successfully",
       data: normalizeResponseData(result.rows[0] || licenseResult.rows[0])
     });
   } catch (error) {
+    if (transactionStarted) {
+      await client.query("ROLLBACK");
+    }
+
     res.status(500).json({
       message: "Error deleting license",
       error: error.message
     });
+  } finally {
+    client.release();
   }
 };

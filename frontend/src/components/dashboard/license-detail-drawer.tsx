@@ -697,7 +697,9 @@ export function LicenseDetailDrawer({
                     <p className="text-sm font-medium">Delete license</p>
                   </div>
                   <p className="mt-1 text-sm leading-6 text-slate-400">
-                    CauFlow blocks deletion when this license is already used by packs, purchases, or granted rights. Commercial history stays protected.
+                    Unused licenses can be deleted. Once buyers have acquired rights or payment
+                    history exists, CauFlow preserves the record and you should archive or
+                    unpublish it instead.
                   </p>
                 </div>
                 <Button

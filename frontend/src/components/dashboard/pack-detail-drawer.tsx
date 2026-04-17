@@ -663,7 +663,9 @@ export function PackDetailDrawer({
                       <p className="text-sm font-medium">Delete pack</p>
                     </div>
                     <p className="mt-1 text-sm leading-6 text-slate-400">
-                      CauFlow blocks deletion when this pack is already tied to purchase or grant history. Existing assets and licenses stay untouched.
+                      Unused packs can be deleted cleanly. Once buyers, grants, or payment history
+                      exist, CauFlow preserves the pack record and you should archive or unpublish
+                      it instead.
                     </p>
                   </div>
                   <Button

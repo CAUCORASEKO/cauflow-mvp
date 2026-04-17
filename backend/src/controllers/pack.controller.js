@@ -1,6 +1,9 @@
 import { pool } from "../config/db.js";
 import { normalizeResponseData } from "../utils/normalize-response.js";
-import { buildPackDeleteBlockMessage } from "../utils/delete-constraints.js";
+import {
+  buildPackDeleteBlockMessage,
+  getPackDeleteDependencyState
+} from "../utils/delete-constraints.js";
 
 const PACK_STATUSES = new Set(["draft", "published", "archived"]);
 const PACK_CATEGORIES = new Set([
@@ -661,10 +664,13 @@ export const updatePack = async (req, res) => {
 };
 
 export const deletePack = async (req, res) => {
+  const client = await pool.connect();
+  let transactionStarted = false;
+
   try {
     const packId = Number(req.params.id);
 
-    const packResult = await pool.query(
+    const packResult = await client.query(
       `
       SELECT *
       FROM packs
@@ -681,51 +687,19 @@ export const deletePack = async (req, res) => {
       });
     }
 
-    const [licenseResult, purchaseResult, grantResult] = await Promise.all([
-      pool.query(
-        `
-        SELECT COUNT(*)::int AS value
-        FROM licenses
-        WHERE source_pack_id = $1
-        `,
-        [packId]
-      ),
-      pool.query(
-        `
-        SELECT COUNT(*)::int AS value
-        FROM purchases
-        WHERE pack_id = $1
-        `,
-        [packId]
-      ),
-      pool.query(
-        `
-        SELECT COUNT(*)::int AS value
-        FROM license_grants
-        WHERE pack_id = $1
-        `,
-        [packId]
-      )
-    ]);
+    const dependencyState = await getPackDeleteDependencyState(client, packId);
 
-    const dependencyCounts = {
-      licenseCount: Number(licenseResult.rows[0]?.value || 0),
-      purchaseCount: Number(purchaseResult.rows[0]?.value || 0),
-      grantCount: Number(grantResult.rows[0]?.value || 0)
-    };
-
-    if (
-      dependencyCounts.licenseCount > 0 ||
-      dependencyCounts.purchaseCount > 0 ||
-      dependencyCounts.grantCount > 0
-    ) {
+    if (!dependencyState.canDelete) {
       return res.status(409).json({
-        message: buildPackDeleteBlockMessage(dependencyCounts),
+        message: buildPackDeleteBlockMessage(dependencyState),
         code: "PACK_DELETE_BLOCKED"
       });
     }
 
-    const result = await pool.query(
+    await client.query("BEGIN");
+    transactionStarted = true;
+
+    const result = await client.query(
       `
       DELETE FROM packs
       WHERE id = $1
@@ -735,14 +709,23 @@ export const deletePack = async (req, res) => {
       [packId, req.user.role, req.user.id]
     );
 
+    await client.query("COMMIT");
+    transactionStarted = false;
+
     res.status(200).json({
       message: "Pack deleted successfully",
       data: normalizeResponseData(result.rows[0] || packResult.rows[0])
     });
   } catch (error) {
+    if (transactionStarted) {
+      await client.query("ROLLBACK");
+    }
+
     res.status(500).json({
       message: "Error deleting pack",
       error: error.message
     });
+  } finally {
+    client.release();
   }
 };
